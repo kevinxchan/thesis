@@ -16,22 +16,22 @@ if [[ -z $1 ]]; then
 fi
 
 # build index for recA
-echo -e "\nbuilding indexes for recA...\n"
+# echo -e "\nbuilding indexes for recA...\n"
 # minimap2 -d indexes/minimap2/recA_99_default.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-echo -e "\nadjusting k-mer sizes...\n"
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# echo -e "\nadjusting k-mer sizes...\n"
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
-echo -e "\nadjusting window sizes...\n"
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# echo -e "\nadjusting window sizes...\n"
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
 echo "\nchecking for dataset names text file...\n"
 if [[ -n "$dataset_names" ]]; then
@@ -46,7 +46,6 @@ fi
 ############
 cd $WORK_DIR
 echo -e "\nrunning minimap2...\n"
-
 
 ######### TEST COMBO, DIFF PARAMS #########
 echo
