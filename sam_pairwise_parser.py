@@ -12,7 +12,9 @@ example usage:
 python sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2
 """
 
+from collections import defaultdict
 from Bio import SeqIO
+import pysam
 import argparse
 import os
 import re
@@ -22,6 +24,16 @@ class ReferenceRecord:
 		self.id = id
 		self.taxonomy = taxonomy
 		self.sequence = sequence
+
+class SamFile():
+	def __init__(self):
+		self.params = None
+		self.avg_ref_aligned = {}
+
+class OutputData():
+	def __init__(self, total_percent_mapped, sam_file):
+		self.total_percent_mapped = total_percent_mapped
+		self.sam_file = sam_file
 
 def list_dir_abs(dir):
 	for f in os.listdir(dir):
@@ -46,15 +58,50 @@ def get_total_percent_mapped(flagstats):
 		percentage = percentage.split(":")[0][1:].rstrip()
 	return percentage if percentage != "N/A" else "0.0%"
 
-def process_sample_folders(folders):
+def get_cigar_len(cigar):
+	length, curr_nums = 0, ""
+	for sub in cigar:
+		if sub.isdigit():
+			curr_nums += sub
+		elif sub == "I" or sub == "D":
+			curr_nums = ""
+		else:
+			length += int(curr_nums)
+			curr_nums = ""
+	return length
+
+def parse_sam_file(sam_file, ref_seqs):
+	aligned_len_map = defaultdict(list)
+	sam_file_obj = SamFile()
+	with open(sam_file, "r") as infile:
+		for line in infile:
+			if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
+				continue
+			elif line.startswith("@PG"):
+				params = line.split("\t")[4]
+				sam_file_obj.params = params
+			else:
+				data = line.split("\t")
+				ref_id, cigar_string = data[2], data[5]
+				cigar_len = get_cigar_len(cigar_string)
+				percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
+				aligned_len_map[ref_id].append(percent_aligned)
+		for k in aligned_len_map.keys():
+			sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
+	return sam_file_obj
+
+def process_sample_folders(folders, ref_seqs):
+	ret = []
 	for sample in folders:
 		for f in list_dir_abs(sample):
 			if f.endswith(".sam"):
 				txt = os.path.basename(f).replace(".sam", ".txt")
 				flagstats_file = os.path.join(sample, "flagstats", txt)
 				total_percent_mapped = get_total_percent_mapped(flagstats_file)
-				print total_percent_mapped
-	return None
+				sam_file = parse_sam_file(f, ref_seqs)
+				output_data = OutputData(total_percent_mapped, sam_file)
+				ret.append(output_data)
+	return ret
 
 def get_args():
 	parser = argparse.ArgumentParser(description = "Script for parsing FASTA reference files and SAM files for some stuff I need. " +
@@ -75,7 +122,9 @@ def main():
 	for f in list_dir_abs(sample_directory):
 		if os.path.isdir(f):
 			subfolders.append(f)
-	result = process_sample_folders(subfolders)
+	all_samples = process_sample_folders(subfolders, ref_seqs)
 
+	outpath = os.path.join(args.output_dir, "minimap2_alignment_summary.txt")
+	
 if __name__ == "__main__":
 	main()
