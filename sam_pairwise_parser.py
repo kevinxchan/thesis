@@ -9,7 +9,7 @@ I need:
 4. % reads mapped (samtools flagstat output / total # of reads)
 
 example usage:
-python sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2
+python sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2
 """
 
 from collections import defaultdict
@@ -78,7 +78,7 @@ def parse_sam_file(sam_file, ref_seqs):
 			if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
 				continue
 			elif line.startswith("@PG"):
-				params = line.split("\t")[4]
+				params = line.split("\t")[4].rstrip("\n")
 				sam_file_obj.params = params
 			else:
 				data = line.split("\t")
@@ -93,6 +93,7 @@ def parse_sam_file(sam_file, ref_seqs):
 def process_sample_folders(folders, ref_seqs):
 	ret = []
 	for sample in folders:
+		print "...sample %s" % sample
 		for f in list_dir_abs(sample):
 			if f.endswith(".sam"):
 				txt = os.path.basename(f).replace(".sam", ".txt")
@@ -115,16 +116,34 @@ def get_args():
 def main():
 	args = get_args()
 	fasta_reference = args.reference_fasta
+	print "fetching reference sequences..."
 	ref_seqs = build_ref_seq_map(fasta_reference)
+	print "...done"
 	sample_directory = args.sample_dir
 
 	subfolders = []
+	print "fetching sample sam files..."
 	for f in list_dir_abs(sample_directory):
 		if os.path.isdir(f):
 			subfolders.append(f)
+	print "...done"
+	print "processing sam files..."
 	all_samples = process_sample_folders(subfolders, ref_seqs)
+	print "...done"
 
+	print "writing output file..."
 	outpath = os.path.join(args.output_dir, "minimap2_alignment_summary.txt")
-	
+	outfile = open(outpath, "w")
+	outfile.write("params_used\tpercent_total_mapped\treference_id\treference_organism\tavg_len_aligned\n")
+	for sample in all_samples:
+		params_used = sample.sam_file.params
+		percent_total_mapped = sample.total_percent_mapped
+		keys = sample.sam_file.avg_ref_aligned.keys() # not saved to table
+		reference_id = ";".join(keys)
+		reference_organism = ";".join(ref_seqs[k].taxonomy for k in keys)
+		avg_len_aligned = ";".join("%s;%s" % (k, v) for k, v in sample.sam_file.avg_ref_aligned.items())
+		outfile.write(str(params_used) + "\t" + str(percent_total_mapped) + "\t" + str(reference_id) + "\t" + str(reference_organism) + "\t" + str(avg_len_aligned) + "\n")
+	print "...done. goodbye"
+
 if __name__ == "__main__":
 	main()
