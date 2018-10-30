@@ -10,8 +10,8 @@ dataset_names=$2
 cd $WORK_DIR
 THREADS=5
 
-if [[ -z $1 ]]; then
-	echo "argument error: pass in working directory"
+if [[ -z $1 || -z $2 ]]; then
+	echo "argument error: pass in working directory and dataset names file"
 	exit 1
 fi
 
