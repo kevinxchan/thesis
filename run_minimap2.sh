@@ -291,6 +291,7 @@ while read name; do
 	for f in *.sam; do
 		filename=${f//.sam}
 		out=${f/.sam/_with_md.bam}
+		# TODO: change filename to filename_no_unmap
 		samtools view -h -F 4 $filename.sam > tmp.sam && mv tmp.sam $filename.sam
 		samtools calmd -S $filename.sam $WORK_DIR/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta | samtools view -bS - > $out
 		mv $out $WORK_DIR/processed/minimap2/$name/sorted_bams

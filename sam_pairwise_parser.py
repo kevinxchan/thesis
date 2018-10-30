@@ -14,7 +14,6 @@ python sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_rec
 
 from collections import defaultdict
 from Bio import SeqIO
-import pysam
 import argparse
 import os
 import re
