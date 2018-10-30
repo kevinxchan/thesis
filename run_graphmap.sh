@@ -10,9 +10,11 @@
 WORK_DIR=$1
 dataset_names=$2
 reference=$3
-THREADS=5
+THREADS=8
+CURR_DIR=$PWD
 
 GRAPHMAP=$(which graphmap)
+SAMTOOLS=$(which samtools)
 
 if [[ -z $1 || -z $2 || -z $3 ]]; then
 	echo "argument error: pass in working directory, dataset names file and path to reference"
@@ -47,9 +49,60 @@ while read name; do
 	echo "FOR DATASET $name"
 	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-	$GRAPHMAP align -r $reference --index $index_file --reads $WORK_DIR/raw_data/$name.fastq.gz -o $WORK_DIR/processed/graphmap/$name/default.sam --extcigar --threads $THREADS
+	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --reads $WORK_DIR/raw_data/$name.fastq.gz -o $WORK_DIR/processed/graphmap/$name/default.sam --extcigar
+done < $dataset_names
+
+
+cd $WORK_DIR
+echo
+echo "getting flagstats for each sample..."
+echo
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name/flagstats
+	cd $WORK_DIR/processed/graphmap/$name
+
+	for f in *.sam; do
+		filename=${f//.sam}
+		samtools flagstat $WORK_DIR/processed/graphmap/$name/$filename.sam > $WORK_DIR/processed/graphmap/$name/flagstats/$filename.txt
+	done
 
 done < $dataset_names
+
+
+echo
+echo "filtering sam files, generating bams..."
+echo
+
+cd $WORK_DIR
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name/sorted_bams
+	cd $WORK_DIR/processed/graphmap/$name
+	for f in *.sam; do
+		filename=${f//.sam}
+		out=${f/.sam/_with_md.bam}
+		samtools view -h -F 4 $filename.sam > $filename_no_unmap.sam && rm $filename.sam
+		samtools calmd -S $filename_no_unmap.sam $reference | samtools view -bS - > $out
+		mv $out $WORK_DIR/processed/graphmap/$name/sorted_bams
+	done
+done < $dataset_names
+
+echo
+echo "sorting and indexing bams..."
+echo
+
+cd $WORK_DIR
+while read name; do
+	echo "FOR DATASET $name"
+	cd $WORK_DIR/processed/graphmap/$name/sorted_bams
+	for f in *_with_md.bam; do
+		filename=${f/.bam/_sorted.bam}
+		samtools sort --threads $THREADS -o $filename $f && samtools index $filename && rm $f
+	done
+done < $dataset_names
+
+cd $CURR_DIR
 
 echo
 echo "############"
