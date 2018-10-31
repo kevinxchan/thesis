@@ -9,7 +9,7 @@ I need:
 4. % reads mapped (samtools flagstat output / total # of reads)
 
 example usage:
-python sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2
+python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
 """
 
 from collections import defaultdict
@@ -77,8 +77,10 @@ def parse_sam_file(sam_file, ref_seqs):
 			if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
 				continue
 			elif line.startswith("@PG"):
-				params = line.split("\t")[4].rstrip("\n")
-				sam_file_obj.params = params
+				pg_header = line.split("\t")
+				for col in pg_header:
+					if col.startswith("CL:"):
+						sam_file_obj.params = col.rstrip("\n")
 			else:
 				data = line.split("\t")
 				ref_id, cigar_string = data[2], data[5]
@@ -109,6 +111,7 @@ def get_args():
 	parser.add_argument("-r", "--reference-fasta", required = True, help = "Path to the fasta file containing all reference sequences.")
 	parser.add_argument("-d", "--sample-dir", required = True, help = "Directory containing folders for each sample.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Output directory. Default: current working directory.")
+	parser.add_argument("-f", "--file-output", default = "", help = "Name of the output file. If not specified, default is 'alignment_summary.txt'.")
 	args = parser.parse_args()
 	return args
 
@@ -119,6 +122,7 @@ def main():
 	ref_seqs = build_ref_seq_map(fasta_reference)
 	print "...done"
 	sample_directory = args.sample_dir
+	file_output = args.file_output if args.file_output else "alignment_summary.txt"
 
 	subfolders = []
 	print "fetching sample sam files..."
@@ -131,7 +135,7 @@ def main():
 	print "...done"
 
 	print "writing output file..."
-	outpath = os.path.join(args.output_dir, "minimap2_alignment_summary.txt")
+	outpath = os.path.join(args.output_dir, file_output)
 	outfile = open(outpath, "w")
 	outfile.write("params_used\tpercent_total_mapped\treference_id\treference_organism\tavg_len_aligned\n")
 	for sample in all_samples:

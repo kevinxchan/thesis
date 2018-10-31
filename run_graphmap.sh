@@ -49,7 +49,7 @@ while read name; do
 	echo "FOR DATASET $name"
 	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --reads $WORK_DIR/raw_data/$name.fastq.gz -o $WORK_DIR/processed/graphmap/$name/default.sam --extcigar
+	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --reads $WORK_DIR/raw_data/$name.fastq.gz -o $WORK_DIR/processed/graphmap/$name/default_no_unmap.sam --extcigar
 done < $dataset_names
 
 
