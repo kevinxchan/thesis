@@ -37,10 +37,27 @@ echo
 echo "aligning reads with..."
 echo
 
+# echo
+# echo "##################"
+# echo "# DEFAULT PARAMS #"
+# echo "##################"
+# echo
+
+# index_file=$index_path/"$(basename $reference.gmidx)"
+
+# while read name; do
+# 	echo "FOR DATASET $name"
+# 	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+# 	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --extcigar \
+# 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+# 	-o $WORK_DIR/processed/graphmap/$name/default_no_unmap.sam
+# done < $dataset_names
+
 echo
-echo "##################"
-echo "# DEFAULT PARAMS #"
-echo "##################"
+echo "############################"
+echo "# DEFAULTS; E-VALUE < 1e-5 #"
+echo "############################"
 echo
 
 index_file=$index_path/"$(basename $reference.gmidx)"
@@ -49,7 +66,60 @@ while read name; do
 	echo "FOR DATASET $name"
 	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --reads $WORK_DIR/raw_data/$name.fastq.gz -o $WORK_DIR/processed/graphmap/$name/default_no_unmap.sam --extcigar
+	$GRAPHMAP align --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/default_eval1e-5_no_unmap.sam
+done < $dataset_names
+
+echo
+echo "##########################"
+echo "# SG ALG; E-VALUE < 1e-5 #"
+echo "##########################"
+echo
+
+index_file=$index_path/"$(basename $reference.gmidx)"
+
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/sg_eval1e-5_no_unmap.sam
+done < $dataset_names
+
+echo
+echo "##########################"
+echo "# SGGOTOH ALG; E-VALUE < 1e-5 #"
+echo "##########################"
+echo
+
+index_file=$index_path/"$(basename $reference.gmidx)"
+
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/sggotoh_eval1e-5_no_unmap.sam
+done < $dataset_names
+
+echo
+echo "###################################"
+echo "# ANCHORGOTOH ALG; E-VALUE < 1e-5 #"
+echo "###################################"
+echo
+
+index_file=$index_path/"$(basename $reference.gmidx)"
+
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/anchorgotoh_eval1e-5_no_unmap.sam
 done < $dataset_names
 
 
