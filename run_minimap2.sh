@@ -18,22 +18,32 @@ if [[ -z $1 || -z $2 || -z $3 ]]; then
 fi
 
 # build index for recA
-# echo -e "\nbuilding indexes for recA...\n"
-# minimap2 -d indexes/minimap2/recA_99_default.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# echo -e "\nadjusting k-mer sizes...\n"
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+echo
+echo "building indexes for recA..."
+echo
 
-# echo -e "\nadjusting window sizes...\n"
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d indexes/minimap2/recA_99_default.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+
+echo
+echo "adjusting k-mer sizes..."
+echo
+
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi -k 11 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi -k 13 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi -k 17 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi -k 19 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi -k 21 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+
+echo
+echo "adjusting window sizes..."
+echo 
+
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi -k 11 -w 3 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi -k 13 -w 4 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi -k 17 -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi -k 19 -w 6 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi -k 21 -w 7 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
 ############
 # MINIMAP2 #
@@ -60,8 +70,8 @@ while read name; do
 	minimap2 -t $THREADS -a --eqx -I 100000 $WORK_DIR/indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_I100k.sam	
 
 	minimap2 -t $THREADS -ax map-ont --eqx $WORK_DIR/indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_map_ont.sam
-	minimap2 -t $THREADS -ax map-ont --eqx -I $WORK_DIR/500000 indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_map_ont_I500k.sam	
-	minimap2 -t $THREADS -ax map-ont --eqx -I $WORK_DIR/100000 indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_map_ont_I100k.sam	
+	minimap2 -t $THREADS -ax map-ont --eqx -I 500000 $WORK_DIR/indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_map_ont_I500k.sam	
+	minimap2 -t $THREADS -ax map-ont --eqx -I 100000 $WORK_DIR/indexes/minimap2/recA_99_default.mmi $WORK_DIR/raw_data/$name.fastq.gz > $WORK_DIR/processed/minimap2/$name/default_map_ont_I100k.sam	
 
 done < $dataset_names
 
