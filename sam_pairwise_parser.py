@@ -12,11 +12,10 @@ example usage:
 python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
 """
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from Bio import SeqIO
 import argparse
 import os
-import re
 
 class ReferenceRecord:
 	def __init__(self, id, taxonomy, sequence):
@@ -28,11 +27,12 @@ class SamFile():
 	def __init__(self):
 		self.params = None
 		self.avg_ref_aligned = {}
+		self.num_unique_reads = 0
+		self.headers = []
+		self.top_hits = OrderedDict()
 
-class OutputData():
-	def __init__(self, total_percent_mapped, sam_file):
-		self.total_percent_mapped = total_percent_mapped
-		self.sam_file = sam_file
+	def get_total_percent_mapped(self):
+		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
 
 def list_dir_abs(dir):
 	for f in os.listdir(dir):
@@ -48,14 +48,15 @@ def build_ref_seq_map(fasta_file):
 			ret[_id] = ReferenceRecord(_id, taxonomy, seq)
 	return ret
 
-def get_total_percent_mapped(flagstats):
-	percentage = ""
-	f = open(flagstats, "r").readlines()
-	match = re.match(r"(.)*(\(.*\))(.)*", f[4])
-	if match:
-		percentage = match.group(2)
-		percentage = percentage.split(":")[0][1:].rstrip()
-	return percentage if percentage != "N/A" else "0.0%"
+# not used...as of now
+# def get_total_percent_mapped(flagstats):
+# 	percentage = ""
+# 	f = open(flagstats, "r").readlines()
+# 	match = re.match(r"(.)*(\(.*\))(.)*", f[4])
+# 	if match:
+# 		percentage = match.group(2)
+# 		percentage = percentage.split(":")[0][1:].rstrip()
+# 	return percentage if percentage != "N/A" else "0.0%"
 
 def get_cigar_len(cigar):
 	length, curr_nums = 0, ""
@@ -74,35 +75,60 @@ def parse_sam_file(sam_file, ref_seqs):
 	sam_file_obj = SamFile()
 	with open(sam_file, "r") as infile:
 		for line in infile:
+			line = line.strip()
 			if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
-				continue
+				sam_file_obj.headers.append(line)
 			elif line.startswith("@PG"):
 				pg_header = line.split("\t")
 				for col in pg_header:
 					if col.startswith("CL:"):
 						sam_file_obj.params = col.rstrip("\n")
+				sam_file_obj.headers.append(line)
 			else:
 				data = line.split("\t")
-				ref_id, cigar_string = data[2], data[5]
-				cigar_len = get_cigar_len(cigar_string)
-				percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
-				aligned_len_map[ref_id].append(percent_aligned)
-		for k in aligned_len_map.keys():
-			sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
+				read_name, mapq = data[0], data[4]
+
+				if read_name not in sam_file_obj.top_hits:
+					if int(mapq) > 0: 
+						sam_file_obj.top_hits[read_name] = data
+					sam_file_obj.num_unique_reads += 1
+				else:
+					stored_mapq = sam_file_obj.top_hits[read_name][4]
+					if int(mapq) > int(stored_mapq):
+						sam_file_obj.top_hits[read_name] = data
+
+	for top_hit_line in sam_file_obj.top_hits.values():
+		ref_id, cigar_string = top_hit_line[2], top_hit_line[5]
+		cigar_len = get_cigar_len(cigar_string)
+		percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
+		aligned_len_map[ref_id].append(percent_aligned)
+
+	for k in aligned_len_map.keys():
+		sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
+
 	return sam_file_obj
 
-def process_sample_folders(folders, ref_seqs):
+def write_top_hits_sam(filepath, sam_file_obj, overwrite):
+	outfile_name, outfile_ext = os.path.splitext(os.path.basename(filepath))
+	print "...writing sam file..."
+	outpath = os.path.dirname(filepath)
+	if not overwrite:
+		outfile_name = "%s_top_hits" % outfile_name
+	outfile = open(os.path.join(outpath, outfile_name + outfile_ext), "w")
+	outfile.write("\n".join(sam_file_obj.headers) + "\n")
+	for line in sam_file_obj.top_hits.values():
+		outfile.write("\t".join(line) + "\n")
+	outfile.close()
+
+def process_sample_folders(folders, ref_seqs, overwrite):
 	ret = []
 	for sample in folders:
 		print "...sample %s" % sample
 		for f in list_dir_abs(sample):
 			if f.endswith(".sam"):
-				txt = os.path.basename(f).replace(".sam", ".txt")
-				flagstats_file = os.path.join(sample, "flagstats", txt)
-				total_percent_mapped = get_total_percent_mapped(flagstats_file)
 				sam_file = parse_sam_file(f, ref_seqs)
-				output_data = OutputData(total_percent_mapped, sam_file)
-				ret.append(output_data)
+				write_top_hits_sam(f, sam_file, overwrite)
+				ret.append(sam_file)
 	return ret
 
 def get_args():
@@ -112,6 +138,7 @@ def get_args():
 	parser.add_argument("-d", "--sample-dir", required = True, help = "Directory containing folders for each sample.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Output directory. Default: current working directory.")
 	parser.add_argument("-f", "--file-output", default = "", help = "Name of the output file. If not specified, default is 'alignment_summary.txt'.")
+	parser.add_argument("-w", "--overwrite", action = "store_true", help = "Specify to overwrite the given sam file with a new sam file containing ONLY the top hits. If not specified, the output sam file will be named FILENAME_top_hits.sam.")
 	args = parser.parse_args()
 	return args
 
@@ -123,6 +150,7 @@ def main():
 	print "...done"
 	sample_directory = args.sample_dir
 	file_output = args.file_output if args.file_output else "alignment_summary.txt"
+	overwrite = args.overwrite
 
 	subfolders = []
 	print "fetching sample sam files..."
@@ -131,20 +159,20 @@ def main():
 			subfolders.append(f)
 	print "...done"
 	print "processing sam files..."
-	all_samples = process_sample_folders(subfolders, ref_seqs)
+	all_sam_files = process_sample_folders(subfolders, ref_seqs, overwrite)
 	print "...done"
 
-	print "writing output file..."
+	print "writing output table..."
 	outpath = os.path.join(args.output_dir, file_output)
 	outfile = open(outpath, "w")
 	outfile.write("params_used\tpercent_total_mapped\treference_id\treference_organism\tavg_len_aligned\n")
-	for sample in all_samples:
-		params_used = sample.sam_file.params
-		percent_total_mapped = sample.total_percent_mapped
-		keys = sample.sam_file.avg_ref_aligned.keys() # not saved to table
+	for sam_file in all_sam_files:
+		params_used = sam_file.params
+		percent_total_mapped = sam_file.get_total_percent_mapped()
+		keys = sam_file.avg_ref_aligned.keys() # not saved to table
 		reference_id = ";".join(keys)
 		reference_organism = ";".join(ref_seqs[k].taxonomy for k in keys)
-		avg_len_aligned = ";".join("%s;%s" % (k, v) for k, v in sample.sam_file.avg_ref_aligned.items())
+		avg_len_aligned = ";".join("%s;%s" % (k, v) for k, v in sam_file.avg_ref_aligned.items())
 		outfile.write(str(params_used) + "\t" + str(percent_total_mapped) + "\t" + str(reference_id) + "\t" + str(reference_organism) + "\t" + str(avg_len_aligned) + "\n")
 	print "...done. goodbye"
 
