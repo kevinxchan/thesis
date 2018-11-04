@@ -291,7 +291,7 @@ while read name; do
 
 	for f in *.sam; do
 		filename=${f//.sam}
-		samtools view -b $filename.sam | samtools sort -n - | samtools view > tmp.sam && mv tmp.sam $filename.sam
+		samtools view -b -h $filename.sam | samtools sort -n - | samtools view > tmp.sam && mv tmp.sam $filename.sam
 	done
 
 done < $dataset_names
