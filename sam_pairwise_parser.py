@@ -15,6 +15,7 @@ python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/r
 from collections import defaultdict, OrderedDict
 from Bio import SeqIO
 import argparse
+import sys
 import os
 
 class ReferenceRecord:
@@ -100,8 +101,13 @@ def parse_sam_file(sam_file, ref_seqs):
 	for top_hit_line in sam_file_obj.top_hits.values():
 		ref_id, cigar_string = top_hit_line[2], top_hit_line[5]
 		cigar_len = get_cigar_len(cigar_string)
-		percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
-		aligned_len_map[ref_id].append(percent_aligned)
+		try:
+			percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
+			aligned_len_map[ref_id].append(percent_aligned)
+		except KeyError:
+			print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you align using the correct reference file?" % ref_id
+			# sys.exit(1)
+			continue # TODO: consider removing this after testing to sys.exit(1)
 
 	for k in aligned_len_map.keys():
 		sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
