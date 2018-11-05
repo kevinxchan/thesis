@@ -4,11 +4,11 @@
 # MAKE SURE YOU MAKE dataset_names.txt FIRST # 
 ##############################################
 # automation of running minimap2. includes building indexes and running the program
-# usage: /home/kchan/scripts_thesis/run_minimap2.sh /home/kchan/thesis /home/kchan/thesis/dataset_names.txt /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# usage: time /home/kchan/scripts_thesis/run_minimap2.sh /home/kchan/thesis /home/kchan/thesis/dataset_names.txt /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 WORK_DIR=$1
 dataset_names=$2
 reference=$3
-THREADS=8
+THREADS=5
 CURR_DIR=$PWD
 
 cd $WORK_DIR
@@ -18,32 +18,32 @@ if [[ -z $1 || -z $2 || -z $3 ]]; then
 fi
 
 # build index for recA
-echo
-echo "building indexes for recA..."
-echo
+# echo
+# echo "building indexes for recA..."
+# echo
 
-minimap2 -d indexes/minimap2/recA_99_default.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d indexes/minimap2/recA_99_default.mmi references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
-echo
-echo "adjusting k-mer sizes..."
-echo
+# echo
+# echo "adjusting k-mer sizes..."
+# echo
 
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi -k 11 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi -k 13 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi -k 17 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi -k 19 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi -k 21 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11.mmi -k 11 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13.mmi -k 13 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17.mmi -k 17 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19.mmi -k 19 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21.mmi -k 21 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
-echo
-echo "adjusting window sizes..."
-echo 
+# echo
+# echo "adjusting window sizes..."
+# echo 
 
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi -k 11 -w 3 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi -k 13 -w 4 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi -k 17 -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi -k 19 -w 6 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
-minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi -k 21 -w 7 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_default_w5.mmi -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k11_w3.mmi -k 11 -w 3 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k13_w4.mmi -k 13 -w 4 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k17_w5.mmi -k 17 -w 5 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k19_w6.mmi -k 19 -w 6 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# minimap2 -d $WORK_DIR/indexes/minimap2/recA_99_k21_w7.mmi -k 21 -w 7 references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
 
 ############
 # MINIMAP2 #
@@ -278,23 +278,23 @@ done < $dataset_names
 #######################
 # SAMTOOLS FORMATTING #
 #######################
-cd $WORK_DIR
+# cd $WORK_DIR
 
-echo
-echo "sorting sam files by read names..."
-echo
+# echo
+# echo "sorting sam files by read names..."
+# echo
 
-while read name; do
-	echo "FOR DATASET $name"
-	mkdir -p $WORK_DIR/processed/minimap2/$name/
-	cd $WORK_DIR/processed/minimap2/$name
+# while read name; do
+# 	echo "FOR DATASET $name"
+# 	mkdir -p $WORK_DIR/processed/minimap2/$name/
+# 	cd $WORK_DIR/processed/minimap2/$name
 
-	for f in *.sam; do
-		filename=${f//.sam}
-		samtools view -b -h $filename.sam | samtools sort -n - | samtools view > tmp.sam && mv tmp.sam $filename.sam
-	done
+# 	for f in *.sam; do
+# 		filename=${f//.sam}
+# 		samtools view -b -h $filename.sam | samtools sort -n - | samtools view -h > tmp.sam && mv tmp.sam $filename.sam
+# 	done
 
-done < $dataset_names
+# done < $dataset_names
 
 # cd $WORK_DIR
 # echo -e "\ngetting stats for each alignment...\n"
