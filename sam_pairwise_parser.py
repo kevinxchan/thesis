@@ -9,7 +9,7 @@ I need:
 4. % reads mapped (samtools flagstat output / total # of reads)
 
 example usage:
-python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
+time python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
 """
 
 from collections import defaultdict, OrderedDict
@@ -33,6 +33,9 @@ class SamFile():
 		self.top_hits = OrderedDict()
 
 	def get_total_percent_mapped(self):
+		if self.num_unique_reads == 0:
+			print "encountered a file with no unique reads, ignoring..."
+			return 0
 		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
 
 def list_dir_abs(dir):
@@ -75,19 +78,34 @@ def parse_sam_file(sam_file, ref_seqs):
 	aligned_len_map = defaultdict(list)
 	sam_file_obj = SamFile()
 	with open(sam_file, "r") as infile:
+		# TODO: remove this after regenerating SAMs with headers inside...
+		filename = os.path.splitext(os.path.basename(sam_file))[0]
+		sam_file_obj.params = filename
+
 		for line in infile:
 			line = line.strip()
-			if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
+			if line.startswith("@"):
+				if line.startswith("@PG"):
+					pg_header = line.split("\t")
+					for col in pg_header:
+						if col.startswith("CL:"):
+							sam_file_obj.params = col.rstrip("\n")
 				sam_file_obj.headers.append(line)
-			elif line.startswith("@PG"):
-				pg_header = line.split("\t")
-				for col in pg_header:
-					if col.startswith("CL:"):
-						sam_file_obj.params = col.rstrip("\n")
-				sam_file_obj.headers.append(line)
+			# if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
+			# 	sam_file_obj.headers.append(line)
+			# elif line.startswith("@PG"):
+			# 	pg_header = line.split("\t")
+			# 	for col in pg_header:
+			# 		if col.startswith("CL:"):
+			# 			sam_file_obj.params = col.rstrip("\n")
+			# 	sam_file_obj.headers.append(line)
 			else:
 				data = line.split("\t")
-				read_name, mapq = data[0], data[4]
+				try:
+					read_name, mapq = data[0], data[4]
+				except:
+					print "FILENAME  THAT FAILED: %s" % sam_file
+					sys.exit(1)
 
 				if read_name not in sam_file_obj.top_hits:
 					if int(mapq) > 0: 
@@ -105,9 +123,8 @@ def parse_sam_file(sam_file, ref_seqs):
 			percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
 			aligned_len_map[ref_id].append(percent_aligned)
 		except KeyError:
-			print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you align using the correct reference file?" % ref_id
-			# sys.exit(1)
-			continue # TODO: consider removing this after testing to sys.exit(1)
+			print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
+			sys.exit(1)
 
 	for k in aligned_len_map.keys():
 		sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
