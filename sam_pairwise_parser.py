@@ -31,6 +31,7 @@ class SamFile():
 		self.num_unique_reads = 0
 		self.headers = []
 		self.top_hits = OrderedDict()
+		self.top_mapq = OrderedDict()
 
 	def get_total_percent_mapped(self):
 		if self.num_unique_reads == 0:
@@ -78,10 +79,6 @@ def parse_sam_file(sam_file, ref_seqs):
 	aligned_len_map = defaultdict(list)
 	sam_file_obj = SamFile()
 	with open(sam_file, "r") as infile:
-		# TODO: remove this after regenerating SAMs with headers inside...
-		filename = os.path.splitext(os.path.basename(sam_file))[0]
-		sam_file_obj.params = filename
-
 		for line in infile:
 			line = line.strip()
 			if line.startswith("@"):
@@ -91,21 +88,13 @@ def parse_sam_file(sam_file, ref_seqs):
 						if col.startswith("CL:"):
 							sam_file_obj.params = col.rstrip("\n")
 				sam_file_obj.headers.append(line)
-			# if line.startswith("@HD") or line.startswith("@SQ") or line.startswith("@RG") or line.startswith("@CO"):
-			# 	sam_file_obj.headers.append(line)
-			# elif line.startswith("@PG"):
-			# 	pg_header = line.split("\t")
-			# 	for col in pg_header:
-			# 		if col.startswith("CL:"):
-			# 			sam_file_obj.params = col.rstrip("\n")
-			# 	sam_file_obj.headers.append(line)
 			else:
 				data = line.split("\t")
 				try:
-					read_name, mapq = data[0], data[4]
+					read_name, ref_id, mapq = data[0], data[2], data[4]
 				except:
-					print "FILENAME  THAT FAILED: %s" % sam_file
-					sys.exit(1)
+					print "WARNING: had a problem with %s, skipping..." % sam_file
+					continue
 
 				if read_name not in sam_file_obj.top_hits:
 					if int(mapq) > 0: 
@@ -116,8 +105,9 @@ def parse_sam_file(sam_file, ref_seqs):
 					if int(mapq) > int(stored_mapq):
 						sam_file_obj.top_hits[read_name] = data
 
-	for top_hit_line in sam_file_obj.top_hits.values():
-		ref_id, cigar_string = top_hit_line[2], top_hit_line[5]
+	for read_name, top_hit_line in sam_file_obj.top_hits.items():
+		ref_id, mapq, cigar_string = top_hit_line[2], top_hit_line[4], top_hit_line[5]
+		sam_file_obj.top_mapq[ref_id] = mapq
 		cigar_len = get_cigar_len(cigar_string)
 		try:
 			percent_aligned = float(cigar_len) / len(ref_seqs[ref_id].sequence)
@@ -188,15 +178,16 @@ def main():
 	print "writing output table..."
 	outpath = os.path.join(args.output_dir, file_output)
 	outfile = open(outpath, "w")
-	outfile.write("params_used\tpercent_total_mapped\treference_id\treference_organism\tavg_len_aligned\n")
+	outfile.write("params_used\tpercent_total_mapped\treference_id\treference_organism\tref_id_mapq\tavg_len_aligned\n")
 	for sam_file in all_sam_files:
 		params_used = sam_file.params
 		percent_total_mapped = sam_file.get_total_percent_mapped()
 		keys = sam_file.avg_ref_aligned.keys() # not saved to table
 		reference_id = ";".join(keys)
 		reference_organism = ";".join(ref_seqs[k].taxonomy for k in keys)
+		ref_id_mapq = ";".join("%s;%s" % (k, v) for k, v in sam_file.top_mapq.items())
 		avg_len_aligned = ";".join("%s;%s" % (k, v) for k, v in sam_file.avg_ref_aligned.items())
-		outfile.write(str(params_used) + "\t" + str(percent_total_mapped) + "\t" + str(reference_id) + "\t" + str(reference_organism) + "\t" + str(avg_len_aligned) + "\n")
+		outfile.write(str(params_used) + "\t" + str(percent_total_mapped) + "\t" + str(reference_id) + "\t" + str(reference_organism) + "\t" + str(ref_id_mapq) + "\t" + str(avg_len_aligned) + "\n")
 	print "...done. goodbye"
 
 if __name__ == "__main__":
