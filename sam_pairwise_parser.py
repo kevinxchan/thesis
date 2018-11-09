@@ -68,7 +68,7 @@ def get_cigar_len(cigar):
 	for sub in cigar:
 		if sub.isdigit():
 			curr_nums += sub
-		elif sub == "I" or sub == "D":
+		elif sub == "I" or sub == "D" or sub == "H" or sub == "S":
 			curr_nums = ""
 		else:
 			length += int(curr_nums)
