@@ -10,6 +10,8 @@ I need:
 
 example usage:
 time python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
+
+IMPORTANT: include --write-top-hits if you want to write the top hits file for each sam!
 """
 
 from collections import defaultdict, OrderedDict
@@ -156,14 +158,15 @@ def write_top_hits_sam(filepath, sam_file_obj, overwrite):
 		outfile.write("\t".join(line) + "\n")
 	outfile.close()
 
-def process_sample_folders(folders, ref_seqs, overwrite):
+def process_sample_folders(folders, ref_seqs, overwrite, write_top_hits):
 	ret = []
 	for sample in folders:
 		print "...sample %s" % sample
 		for f in list_dir_abs(sample):
 			if f.endswith(".sam") and not f.endswith("_top_hits.sam"):
 				sam_file = parse_sam_file(f, ref_seqs)
-				# write_top_hits_sam(f, sam_file, overwrite) # comment this out for stop writing output sams
+				if write_top_hits:
+					write_top_hits_sam(f, sam_file, overwrite) # comment this out for stop writing output sams
 				ret.append(sam_file)
 	return ret
 
@@ -172,9 +175,10 @@ def get_args():
 		"Outputs a summary table.")
 	parser.add_argument("-r", "--reference-fasta", required = True, help = "Path to the fasta file containing all reference sequences.")
 	parser.add_argument("-d", "--sample-dir", required = True, help = "Directory containing folders for each sample.")
-	parser.add_argument("-o", "--output-dir", default = ".", help = "Output directory. Default: current working directory.")
-	parser.add_argument("-f", "--file-output", default = "", help = "Name of the output file. If not specified, default is 'alignment_summary.txt'.")
-	parser.add_argument("-w", "--overwrite", action = "store_true", help = "Specify to overwrite the given sam file with a new sam file containing ONLY the top hits. If not specified, the output sam file will be named FILENAME_top_hits.sam.")
+	parser.add_argument("-o", "--output-dir", default = ".", help = "Path to the output directory. [current working directory]")
+	parser.add_argument("-f", "--file-output", default = "", help = "Name of the output file. [alignment_summary.txt]")
+	parser.add_argument("-w", "--overwrite", action = "store_true", help = "Specify to overwrite the given sam file with a new sam file containing ONLY the top hits. [FILENAME_top_hits.sam]")
+	parser.add_argument("--write-top-hits", action = "store_true", help = "Specify to write a sam file containing top hits based on max mapping quality per read. [false]")
 	args = parser.parse_args()
 	return args
 
@@ -188,6 +192,7 @@ def main():
 	file_output = args.file_output if args.file_output else "alignment_summary.txt"
 	out_name, out_ext = os.path.splitext(file_output)
 	overwrite = args.overwrite
+	write_top_hits = args.write_top_hits
 
 	subfolders = []
 	print "fetching sample sam files..."
@@ -196,7 +201,7 @@ def main():
 			subfolders.append(f)
 	print "...done"
 	print "processing sam files..."
-	all_sam_files = process_sample_folders(subfolders, ref_seqs, overwrite)
+	all_sam_files = process_sample_folders(subfolders, ref_seqs, overwrite, write_top_hits)
 	print "...done"
 
 	print "writing output tables..."
