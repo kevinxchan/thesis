@@ -1,20 +1,22 @@
 from collections import defaultdict, OrderedDict
+import numpy as np
+import matplotlib 
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 
 class ReferenceRecord:
+
 	def __init__(self, id, taxonomy, sequence):
 		self.id = id
 		self.taxonomy = taxonomy
 		self.sequence = sequence
 
 class SamFile():
+
 	def __init__(self):
 		self.params = None
 		self.dataset_name = ""
 		self.avg_ref_aligned = {}
-		self.count_reads_geq_50 = defaultdict(int)
-		self.count_reads_geq_90 = defaultdict(int)
-		self.percent_reads_geq_50 = defaultdict(float)
-		self.percent_reads_geq_90 = defaultdict(float)
 		self.num_unique_reads = 0
 		self.headers = []
 		self.reads_aligned_per_ref = defaultdict(int)
@@ -27,3 +29,25 @@ class SamFile():
 			return 0
 		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
 
+class Histogram():
+
+	def __init__(self, bin_size = 10):
+		self.bin_start = 0
+		self.bin_end = 100
+		self.bin_size = bin_size
+		self.counts_per_bin = defaultdict(list)
+
+	def add_to_bin(self, params, dataset_name, ref_id, percent_aligned):
+		self.counts_per_bin[(params, dataset_name, ref_id)].append(percent_aligned)
+
+	def plot_histograms(self, filename, ref_seqs):
+		bins = np.arange(self.bin_start, self.bin_end + self.bin_size, self.bin_size)
+		for params, dataset_name, ref_id in self.counts_per_bin.keys():
+			plt.figure()
+			plt.hist(self.counts_per_bin[(params, dataset_name, ref_id)], bins = bins, label = "%s (%s)" % (ref_seqs[ref_id].taxonomy, ref_id))
+			plt.title("%s (reference organism = %s, ID = %s)" % (dataset_name, ref_seqs[ref_id].taxonomy, ref_id), fontsize = 8)
+			plt.xlabel("Bins (bin size = %d)" % self.bin_size)
+			plt.ylabel("Count")
+			out_taxa = ref_seqs[ref_id].taxonomy.replace(" ", "").replace("/", "")
+			plt.savefig("%s_%s_%s.png" % (filename, ref_id, out_taxa))	
+			plt.close()
