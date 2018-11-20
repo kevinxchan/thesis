@@ -9,43 +9,17 @@ I need:
 4. % reads mapped (samtools flagstat output / total # of reads)
 
 example usage:
-time python /home/kchan/scripts_thesis/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
+time python /home/kchan/scripts_thesis/py/sam_pairwise_parser.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -d /home/kchan/thesis/processed/minimap2 -o /home/kchan/thesis/processed/minimap2 -f minimap2_alignment_summary.txt
 
 IMPORTANT: include --write-top-hits if you want to write the top hits file for each sam!
 """
 
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from Bio import SeqIO
 import argparse
 import sys
 import os
-
-class ReferenceRecord:
-	def __init__(self, id, taxonomy, sequence):
-		self.id = id
-		self.taxonomy = taxonomy
-		self.sequence = sequence
-
-class SamFile():
-	def __init__(self):
-		self.params = None
-		self.dataset_name = ""
-		self.avg_ref_aligned = {}
-		self.count_reads_geq_50 = defaultdict(int)
-		self.count_reads_geq_90 = defaultdict(int)
-		self.percent_reads_geq_50 = defaultdict(float)
-		self.percent_reads_geq_90 = defaultdict(float)
-		self.num_unique_reads = 0
-		self.headers = []
-		self.reads_aligned_per_ref = defaultdict(int)
-		self.top_hits = OrderedDict()
-		self.top_mapq = OrderedDict()
-
-	def get_total_percent_mapped(self):
-		if self.num_unique_reads == 0:
-			print "encountered a file with no unique reads, ignoring..."
-			return 0
-		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
+from model.sam_parser_classes import ReferenceRecord, SamFile, Histogram
 
 def list_dir_abs(dir):
 	for f in os.listdir(dir):
@@ -120,6 +94,8 @@ def parse_sam_file(sam_file, ref_seqs):
 					if int(mapq) > int(stored_mapq):
 						sam_file_obj.top_hits[read_name] = data
 
+	hist = Histogram(5)
+
 	for read_name, top_hit_line in sam_file_obj.top_hits.items():
 		ref_id, mapq, cigar_string = top_hit_line[2], top_hit_line[4], top_hit_line[5]
 		sam_file_obj.top_mapq[ref_id] = mapq
@@ -129,18 +105,13 @@ def parse_sam_file(sam_file, ref_seqs):
 			percent_aligned = float(cigar_len) / ref_length * 100
 			if percent_aligned == 100.0:
 				print "read %s aligned 100% of reference %s!" % (read_name, ref_id)
-			sam_file_obj.count_reads_geq_50[ref_id] += 1 if percent_aligned >= 50.0 else 0
-			sam_file_obj.count_reads_geq_90[ref_id] += 1 if percent_aligned >= 90.0 else 0
+			hist.add_to_bin(sam_file_obj.params, sam_file_obj.dataset_name, ref_id, percent_aligned)
 			sam_file_obj.reads_aligned_per_ref[ref_id] += 1
 			aligned_len_map[ref_id].append(percent_aligned)
 		except KeyError:
 			print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
 			sys.exit(1)
-	for ref_id in sam_file_obj.count_reads_geq_50.keys():
-		# print "ref id %s, num reads over 50 %f, num reads over 90 %f, len ref seq %d, num aligned to this ref is %d" % (ref_id, percent_reads_geq_50[ref_id], percent_reads_geq_90[ref_id], len(ref_seqs[ref_id].sequence), len(aligned_len_map[ref_id]))
-		sam_file_obj.percent_reads_geq_50[ref_id] = round(float(sam_file_obj.count_reads_geq_50[ref_id]) / sam_file_obj.reads_aligned_per_ref[ref_id] * 100, 2)
-	for ref_id in sam_file_obj.count_reads_geq_90.keys():
-		sam_file_obj.percent_reads_geq_90[ref_id] = round(float(sam_file_obj.count_reads_geq_90[ref_id]) / sam_file_obj.reads_aligned_per_ref[ref_id] * 100, 2)
+	hist.plot_histograms(os.path.splitext(sam_file)[0], ref_seqs)
 	for k in aligned_len_map.keys():
 		sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
 
@@ -166,7 +137,7 @@ def process_sample_folders(folders, ref_seqs, overwrite, write_top_hits):
 			if f.endswith(".sam") and not f.endswith("_top_hits.sam"):
 				sam_file = parse_sam_file(f, ref_seqs)
 				if write_top_hits:
-					write_top_hits_sam(f, sam_file, overwrite) # comment this out for stop writing output sams
+					write_top_hits_sam(f, sam_file, overwrite)
 				ret.append(sam_file)
 	return ret
 
@@ -214,17 +185,13 @@ def main():
 		num_unique_reads = sam_file.num_unique_reads
 		percent_total_mapped = sam_file.get_total_percent_mapped()
 		num_aligned_ref_total = ";".join("%s;%d" % (k, v) for k, v in sam_file.reads_aligned_per_ref.items())
-		num_aligned_ref_50 = ";".join("%s;%d" % (k, v) for k, v in sam_file.count_reads_geq_50.items())
-		percent_50 = ";".join("%s;%s" % (k, v) for k, v in sam_file.percent_reads_geq_50.items())
-		num_aligned_ref_90 = ";".join("%s;%d" % (k, v) for k, v in sam_file.count_reads_geq_90.items())
-		percent_90 = ";".join("%s;%s" % (k, v) for k, v in sam_file.percent_reads_geq_90.items())
 		keys = sam_file.avg_ref_aligned.keys() # not saved to table
 		reference_id = ";".join(keys)
 		reference_organism = ";".join(ref_seqs[k].taxonomy for k in keys)
 		ref_id_mapq = ";".join("%s;%s" % (k, v) for k, v in sam_file.top_mapq.items())
 		avg_len_aligned = ";".join("%s;%s" % (k, v) for k, v in sam_file.avg_ref_aligned.items())
 		
-		out_line = "\t".join(map(str, [params_used, num_unique_reads, percent_total_mapped, num_aligned_ref_total, num_aligned_ref_50, percent_50, num_aligned_ref_90, percent_90, reference_id, reference_organism, ref_id_mapq, avg_len_aligned]))
+		out_line = "\t".join(map(str, [params_used, num_unique_reads, percent_total_mapped, num_aligned_ref_total, reference_id, reference_organism, ref_id_mapq, avg_len_aligned]))
 		out_table_full.write(out_line + "\n")
 	print "...done. goodbye"
 
