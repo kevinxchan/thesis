@@ -178,7 +178,7 @@ def main():
 	print "writing output tables..."
 	outpath_table_full = os.path.join(args.output_dir, file_output)
 	out_table_full = open(outpath_table_full, "w")
-	out_table_full.write("params_used\tnum_unique_reads\tpercent_total_mapped\tnum_aligned_ref_total\tnum_aligned_ref_50\tpercent_50\tnum_aligned_ref_90\tpercent_90\treference_id\treference_organism\tref_id_mapq\tavg_len_aligned\n")
+	out_table_full.write("params_used\tnum_unique_reads\tpercent_total_mapped\tnum_aligned_ref_total\treference_id\treference_organism\tref_id_mapq\tavg_len_aligned\n")
 	
 	for sam_file in all_sam_files:
 		params_used = sam_file.params
