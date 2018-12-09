@@ -8,6 +8,9 @@ How it works:
 4. For each reference aligned to, get the LCA between it and 3. Multiply by # reads aligned > 80% 
 5. Repeat for all parameter sets, for all datasets.
 6. Pick the param set with the most min. number of scores.
+
+USAGE:
+python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
 """
 
 import sys
@@ -29,8 +32,19 @@ def get_args():
 	args = parser.parse_args()
 	return args
 
-def query_jgi_taxa():
-	pass
+def query_jgi_taxa(taxonomy):
+	"""
+	endpoints:
+
+	/ancestor/entry_1,entry_2,entry_n: get the LCA between two or more taxonomy strings
+	/sc/entry_1: 					   get the full taxa string as a semicolon delimited string
+
+	possible to combine the two above (i.e. /ancestor/sc/...)
+	"""
+	url = "http://taxonomy.jgi-psf.org/name"
+	r = requests.get(os.path.join(url, taxonomy))
+	#print r.json()
+	#print r
 
 def main():
 	args = get_args()
@@ -40,3 +54,6 @@ def main():
 			dataset_id, taxonomy = line.strip().split("\t")
 			full_lineage = query_jgi_taxa(taxonomy)
 			dataset_to_reported_taxa[dataset_id] = full_lineage
+
+if __name__ == "__main__":
+	main()
