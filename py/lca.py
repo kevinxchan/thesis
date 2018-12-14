@@ -16,7 +16,8 @@ python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fun
 import sys
 import os
 import requests
-from collections import OrderedDict
+import time
+from collections import defaultdict, OrderedDict
 from argparse import ArgumentParser
 from Bio import SeqIO
 from sam_pairwise_parser import build_ref_seq_map
@@ -32,28 +33,72 @@ def get_args():
 	args = parser.parse_args()
 	return args
 
-def query_jgi_taxa(taxonomy):
-	"""
-	endpoints:
+def validate_query(entry):
+	illegals = [" ", "<", ">", "#", "%", "{", "}", "|", "\"", "/", "^", "~", "[", "]", "`", "-"]
+	for illegal in illegals:
+		entry = entry.replace(illegal, "_")
+	return entry
 
+def query_jgi_error(entry):
+	"""
+	verifies whether or not the NCBI contains an entry for query 'entry'.
+
+	@return True if the NCBI doesn't contain 'entry', false otherwise
+	"""
+	url = "http://taxonomy.jgi-psf.org/name"
+	r = requests.get(os.path.join(url, entry))
+	response = r.json()
+	return "error" in response[entry].keys()
+
+def query_jgi_lca(entry_1, entry_2):
+	"""
+	queries the jgi taxonomy server and retrieves the LCA between two taxa strings.
+	endpoints:
 	/ancestor/entry_1,entry_2,entry_n: get the LCA between two or more taxonomy strings
 	/sc/entry_1: 					   get the full taxa string as a semicolon delimited string
 
 	possible to combine the two above (i.e. /ancestor/sc/...)
+
+	@return a list containing the full lineage of the LCA
 	"""
-	url = "http://taxonomy.jgi-psf.org/name"
-	r = requests.get(os.path.join(url, taxonomy))
-	#print r.json()
-	#print r
+	entry_1 = validate_query(entry_1)
+	entry_2 = validate_query(entry_2)
+	if query_jgi_error(entry_1) or query_jgi_error(entry_2):
+		print "WARNING: reference sequence %s or %s not found in NCBI. assigning a LCA of 'l:Life'." % (entry_1, entry_2)
+		return ["l:Life"]
+	url = "http://taxonomy.jgi-psf.org/name/ancestor/sc"
+	query = ",".join([entry_1, entry_2])
+	r = requests.get(os.path.join(url, query))
+	try:
+		response = r.json()
+		error = response.values()[0]
+		print "ERROR: query with %s, %s failed with response '%s'. exiting." % (entry_1, entry_2, error)
+		sys.exit(1)
+	except ValueError:
+		response = r.text
+	tax_list = response.split(";")
+	no_rank_level = 1
+	for level in tax_list:
+		if len(level.split(":")) == 1:
+			rank = "nr%d" % no_rank_level
+			print "WARNING: taxonomic rank not found for level '%s' assigning a rank of '%s'." % (level, rank)
+			level = rank + ":" + level
+			no_rank_level += 1
+	return tax_list
 
 def main():
 	args = get_args()
-	dataset_to_reported_taxa = {}
+	dataset_to_lca = defaultdict(dict)
+	print "gathering reference taxonomies from reference file..."
+	ref_seq_map = build_ref_seq_map(args.reference_fasta)
+	print "getting LCAs between dataset organism and all references..."
 	with open(args.dataset_taxonomies, "r") as f:
 		for line in f:
 			dataset_id, taxonomy = line.strip().split("\t")
-			full_lineage = query_jgi_taxa(taxonomy)
-			dataset_to_reported_taxa[dataset_id] = full_lineage
+			start_time = time.time()
+			for ref_record in ref_seq_map.values():
+				dataset_to_lca[dataset_id][ref_record.id] = query_jgi_lca(taxonomy, ref_record.taxonomy)
+			print "done for dataset %s. time elapsed: %d" % (dataset_id, time.time() - start_time)
 
 if __name__ == "__main__":
 	main()
