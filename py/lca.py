@@ -61,12 +61,14 @@ def query_jgi_lca(entry_1, entry_2):
 
 	@return a list containing the full lineage of the LCA
 	"""
+	url = "http://taxonomy.jgi-psf.org/name/ancestor/sc"
+
 	entry_1 = validate_query(entry_1)
 	entry_2 = validate_query(entry_2)
 	if query_jgi_error(entry_1) or query_jgi_error(entry_2):
-		print "WARNING: reference sequence %s or %s not found in NCBI. assigning a LCA of 'l:Life'." % (entry_1, entry_2)
-		return ["l:Life"]
-	url = "http://taxonomy.jgi-psf.org/name/ancestor/sc"
+		print "WARNING: reference sequence %s or %s not found in NCBI. assigning an empty LCA." % (entry_1, entry_2)
+		return []
+
 	query = ",".join([entry_1, entry_2])
 	r = requests.get(os.path.join(url, query))
 	try:
@@ -91,7 +93,7 @@ def get_longest_lca(dataset_to_lca):
 	"""
 	returns the deepest lca between each dataset and the reference sequences.
 	# TODO: what if multiple references are of the same length?
-	
+
 	@return deepest lca 
 	"""
 	optimal_placements = {}
@@ -122,6 +124,7 @@ def main():
 			print "done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
 	print "getting optimal placements (deepest LCA) for each dataset..."
 	optimal_placements = get_longest_lca(dataset_to_lca)
+	
 	
 if __name__ == "__main__":
 	main()
