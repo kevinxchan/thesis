@@ -34,7 +34,7 @@ def get_args():
 	return args
 
 def validate_query(entry):
-	illegals = [" ", "<", ">", "#", "%", "{", "}", "|", "\"", "/", "^", "~", "[", "]", "`", "-"]
+	illegals = [" ", "<", ">", "#", "%", "{", "}", "|", "\"", "/", "^", "~", "[", "]", "`", "-", "'", '"', "."]
 	for illegal in illegals:
 		entry = entry.replace(illegal, "_")
 	return entry
@@ -78,13 +78,34 @@ def query_jgi_lca(entry_1, entry_2):
 		response = r.text
 	tax_list = response.split(";")
 	no_rank_level = 1
-	for level in tax_list:
+	for i in range(len(tax_list)):
+		level = tax_list[i]
 		if len(level.split(":")) == 1:
 			rank = "nr%d" % no_rank_level
 			print "WARNING: taxonomic rank not found for level '%s' assigning a rank of '%s'." % (level, rank)
-			level = rank + ":" + level
+			tax_list[i] = rank + ":" + level
 			no_rank_level += 1
 	return tax_list
+
+def get_longest_lca(dataset_to_lca):
+	"""
+	returns the deepest lca between each dataset and the reference sequences.
+	# TODO: what if multiple references are of the same length?
+	
+	@return deepest lca 
+	"""
+	optimal_placements = {}
+	for _id in dataset_to_lca:
+		depth = -1
+		optimal_placement = []
+		for ref_id in dataset_to_lca[_id]:
+			if len(dataset_to_lca[_id][ref_id]) > depth:
+				print _id, ref_id
+				print dataset_to_lca[_id][ref_id]
+				optimal_placement = dataset_to_lca[_id][ref_id]
+				depth = len(optimal_placement)
+		optimal_placements[_id] = optimal_placement
+	return optimal_placements
 
 def main():
 	args = get_args()
@@ -96,9 +117,11 @@ def main():
 		for line in f:
 			dataset_id, taxonomy = line.strip().split("\t")
 			start_time = time.time()
-			for ref_record in ref_seq_map.values():
+			for ref_record in ref_seq_map.values()[0:10]:
 				dataset_to_lca[dataset_id][ref_record.id] = query_jgi_lca(taxonomy, ref_record.taxonomy)
-			print "done for dataset %s. time elapsed: %d" % (dataset_id, time.time() - start_time)
-
+			print "done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
+	print "getting optimal placements (deepest LCA) for each dataset..."
+	optimal_placements = get_longest_lca(dataset_to_lca)
+	
 if __name__ == "__main__":
 	main()
