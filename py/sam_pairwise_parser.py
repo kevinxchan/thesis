@@ -74,7 +74,7 @@ def parse_sam_file(sam_file, ref_seqs):
 					for col in pg_header:
 						if col.startswith("CL:"):
 							col_stripped = col.rstrip("\n")
-							sam_file_obj.dataset_name = parse_dataset_name(col_stripped)
+							sam_file_obj.dataset_name = sam_file_obj.parse_dataset_name(col_stripped)
 							sam_file_obj.params = col_stripped
 				sam_file_obj.headers.append(line)
 			else:
