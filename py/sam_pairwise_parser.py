@@ -19,11 +19,8 @@ from Bio import SeqIO
 import argparse
 import sys
 import os
+from util.file_utils import list_dir_abs
 from model.sam_parser_classes import ReferenceRecord, SamFile, Histogram
-
-def list_dir_abs(dir):
-	for f in os.listdir(dir):
-		yield os.path.abspath(os.path.join(dir, f))
 
 def build_ref_seq_map(fasta_file):
 	ret = {}
