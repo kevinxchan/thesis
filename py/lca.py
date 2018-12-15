@@ -5,7 +5,7 @@ How it works:
 1. Query JGI taxonomy server to get full taxonomies of the organisms in the reference fasta.
 2. Do 1. again, but with the reported organism in each dataset.
 3. Calculate the LCA between 1. and 2., and use this as the comparison point.
-4. For each reference aligned to, get the LCA between it and 3. Multiply by # reads aligned > 80% 
+4. For each reference aligned to, get the LCA between it and 3. Multiply by # reads aligned >= 80% 
 5. Repeat for all parameter sets, for all datasets.
 6. Pick the param set with the most min. number of scores.
 
@@ -19,10 +19,8 @@ import requests
 import time
 from collections import defaultdict, OrderedDict
 from argparse import ArgumentParser
-from Bio import SeqIO
 from sam_pairwise_parser import build_ref_seq_map
-
-
+from model.sam_parser_classes import SamFile, get_cigar_len
 
 def get_args():
 	parser = ArgumentParser(description = "Script to rank alignments based on LCA and proportion of reads mapped over 80% of the reference.")
@@ -109,6 +107,38 @@ def get_longest_lca(dataset_to_lca):
 		optimal_placements[_id] = optimal_placement
 	return optimal_placements
 
+def parse_sam_file(sam_file, ref_seqs):
+	aligned_len_map = defaultdict(list) # key: reference ID, values: list of percent length of read mapped to reference
+	sam_file_obj = SamFile()
+	with open(sam_file, "r") as infile:
+		for line in infile:
+			line = line.strip()
+			if line.startswith("@"):
+				if line.startswith("@PG"):
+					pg_header = line.split("\t")
+					for col in pg_header:
+						if col.startswith("CL:"):
+							col_stripped = col.rstrip("\n")
+							sam_file_obj.dataset_name = sam_file_obj.parse_dataset_name(col_stripped)
+							sam_file_obj.params = col_stripped
+				sam_file_obj.headers.append(line)
+			else:
+				data = line.split("\t")
+				try:
+					ref_id, cigar_string = data[2], data[5]
+				except:
+					print "WARNING: had a problem with %s, skipping..." % sam_file
+					continue
+				try:
+					ref_length = len(ref_seqs[ref_id].sequence)
+					cigar_len = get_cigar_len(cigar_string)
+					percent_aligned = float(cigar_len) / ref_length * 100
+					aligned_len_map[ref_id].append(percent_aligned)
+				except KeyError:
+					print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
+					sys.exit(1)
+	return sam_file_obj
+
 def main():
 	args = get_args()
 	dataset_to_lca = defaultdict(dict)
@@ -124,7 +154,6 @@ def main():
 			print "done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
 	print "getting optimal placements (deepest LCA) for each dataset..."
 	optimal_placements = get_longest_lca(dataset_to_lca)
-	
 	
 if __name__ == "__main__":
 	main()
