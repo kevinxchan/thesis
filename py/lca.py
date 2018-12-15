@@ -19,6 +19,7 @@ import requests
 import time
 from collections import defaultdict, OrderedDict
 from argparse import ArgumentParser
+from util.file_utils import list_dir_abs
 from sam_pairwise_parser import build_ref_seq_map
 from model.sam_parser_classes import SamFile, get_cigar_len
 
@@ -47,6 +48,15 @@ def query_jgi_error(entry):
 	r = requests.get(os.path.join(url, entry))
 	response = r.json()
 	return "error" in response[entry].keys()
+
+def query_jgi_taxa(entry):
+	"""
+	queries the jgi taxonomy server and returns the full lineage (as a list) for a given taxa string.
+
+	@return full lineage of 'entry'
+	"""
+	# TODO: implement
+	return []
 
 def query_jgi_lca(entry_1, entry_2):
 	"""
@@ -154,6 +164,19 @@ def main():
 			print "done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
 	print "getting optimal placements (deepest LCA) for each dataset..."
 	optimal_placements = get_longest_lca(dataset_to_lca)
-	
+	print "running through each sam file for each dataset..."
+	all_sam_obj = []
+	for item in list_dir_abs(args.sample_dir):
+		if os.path.isdir(item):
+			for sam_file in list_dir_abs(item):
+				if sam_file.endswith("_top_hits.sam"):
+					all_sam_obj.append(parse_sam_file(sam_file))
+	print "calculating distances between each reference aligned to and its lca..."
+	for sam_obj in all_sam_obj:
+		# TODO: get full lineages of each reference aligned to 
+		# calculate distance between that and lca
+		# multiply by number of reads >= 80% (aligned_len_map in sam_obj)
+		pass
+
 if __name__ == "__main__":
 	main()
