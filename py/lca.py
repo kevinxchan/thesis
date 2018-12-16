@@ -55,8 +55,29 @@ def query_jgi_taxa(entry):
 
 	@return full lineage of 'entry'
 	"""
-	# TODO: implement
-	return []
+	url = "http://taxonomy.jgi-psf.org/name/sc"
+	entry = validate_query(entry)
+	if query_jgi_error(entry):
+		print "WARNING: query sequence %s. assigning an empty LCA." % (entry)
+		return []
+	r = requests.get(os.path.join(url, entry))
+	try:
+		response = r.json()
+		error = response.values()[0]
+		print "ERROR: query with %s, %s failed with response '%s'. exiting." % (entry, error)
+		sys.exit(1)
+	except ValueError:
+		response = r.text
+	tax_list = response.split(";")
+	no_rank_level = 1
+	for i in range(len(tax_list)):
+		level = tax_list[i]
+		if len(level.split(":")) == 1:
+			rank = "nr%d" % no_rank_level
+			print "WARNING: taxonomic rank not found for level '%s' assigning a rank of '%s'." % (level, rank)
+			tax_list[i] = rank + ":" + level
+			no_rank_level += 1
+	return tax_list
 
 def query_jgi_lca(entry_1, entry_2):
 	"""
@@ -102,7 +123,7 @@ def get_longest_lca(dataset_to_lca):
 	returns the deepest lca between each dataset and the reference sequences.
 	# TODO: what if multiple references are of the same length?
 
-	@return deepest lca 
+	@return dict, where keys = dataset id and values = deepest lca
 	"""
 	optimal_placements = {}
 	for _id in dataset_to_lca:
@@ -110,8 +131,6 @@ def get_longest_lca(dataset_to_lca):
 		optimal_placement = []
 		for ref_id in dataset_to_lca[_id]:
 			if len(dataset_to_lca[_id][ref_id]) > depth:
-				print _id, ref_id
-				print dataset_to_lca[_id][ref_id]
 				optimal_placement = dataset_to_lca[_id][ref_id]
 				depth = len(optimal_placement)
 		optimal_placements[_id] = optimal_placement
@@ -147,7 +166,39 @@ def parse_sam_file(sam_file, ref_seqs):
 				except KeyError:
 					print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
 					sys.exit(1)
-	return sam_file_obj
+	return aligned_len_map, sam_file_obj
+
+def taxonomic_distance(lineage_1, lineage_2):
+	"""
+	calculates the taxonomic distance between two lineages
+
+	@return the taxonomic distance between lineage_1 and lineage_2
+	"""
+	# TODO: implement
+	return 0
+
+def reads_over_threshold(reads, threshold):
+	"""
+	counts the number of reads in a list of reads over the given threshold
+
+	@param reads a list of reads aligned to a reference as a percentage
+	@param threshold the minimum percent aligned
+	@return the number of reads aligning to a reference >= threshold 
+	"""
+	return sum(1 for read_p in reads if read_p >= threshold)
+
+def calculate_distance(full_ref_lineage, reads_aligned_p, optimal_placement):
+	"""
+	calculate the distance between a reference aligned to and the optimal placement 
+	for a given dataset. distance is measured as:
+
+		taxonomic_distance(ref_aligned_to, optimal_placement) * number of reads aligned >= 80%
+
+	@return a weighted distance between the reference aligned to and the optimal placment
+	"""
+	taxa_distance = taxonomic_distance(full_ref_lineage, optimal_placement)
+	reads = reads_over_threshold(reads_aligned_p, 80)
+	return taxa_distance * reads
 
 def main():
 	args = get_args()
@@ -165,18 +216,21 @@ def main():
 	print "getting optimal placements (deepest LCA) for each dataset..."
 	optimal_placements = get_longest_lca(dataset_to_lca)
 	print "running through each sam file for each dataset..."
-	all_sam_obj = []
+	all_sam_files = []
 	for item in list_dir_abs(args.sample_dir):
 		if os.path.isdir(item):
 			for sam_file in list_dir_abs(item):
 				if sam_file.endswith("_top_hits.sam"):
-					all_sam_obj.append(parse_sam_file(sam_file))
+					all_sam_files.append(parse_sam_file(sam_file))
 	print "calculating distances between each reference aligned to and its lca..."
-	for sam_obj in all_sam_obj:
+	for v in all_sam_files:
 		# TODO: get full lineages of each reference aligned to 
 		# calculate distance between that and lca
 		# multiply by number of reads >= 80% (aligned_len_map in sam_obj)
-		pass
+		aligned_len_map, sam_obj = v[0], v[1]
+		for ref_id in aligned_len_map:
+			full_ref_lineage = query_jgi_taxa(ref_seq_map[ref_id])
+			distance = calculate_distance(full_ref_lineage, aligned_len_map[ref_id], optimal_placements[sam_obj.dataset_name])
 
 if __name__ == "__main__":
 	main()
