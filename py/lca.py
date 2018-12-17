@@ -17,11 +17,11 @@ import sys
 import os
 import requests
 import time
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from argparse import ArgumentParser
 from util.file_utils import list_dir_abs
-from sam_pairwise_parser import build_ref_seq_map
-from model.sam_parser_classes import SamFile, get_cigar_len
+from sam_pairwise_parser import build_ref_seq_map, get_cigar_len
+from model.sam_parser_classes import SamFile
 
 def get_args():
 	parser = ArgumentParser(description = "Script to rank alignments based on LCA and proportion of reads mapped over 80% of the reference.")
@@ -126,14 +126,19 @@ def get_longest_lca(dataset_to_lca):
 	@return dict, where keys = dataset id and values = deepest lca
 	"""
 	optimal_placements = {}
+	depth = -1
 	for _id in dataset_to_lca:
-		depth = -1
-		optimal_placement = []
-		for ref_id in dataset_to_lca[_id]:
-			if len(dataset_to_lca[_id][ref_id]) > depth:
-				optimal_placement = dataset_to_lca[_id][ref_id]
-				depth = len(optimal_placement)
-		optimal_placements[_id] = optimal_placement
+		if _id == "DRR129261":
+			# depth = -1
+			optimal_placement = []
+			for ref_id in dataset_to_lca[_id]:
+				print ref_id
+				if len(dataset_to_lca[_id][ref_id]) > depth:
+					optimal_placement = dataset_to_lca[_id][ref_id]
+					depth = len(optimal_placement)
+			optimal_placements[_id] = optimal_placement
+	print "max depth: %d" % depth
+	print optimal_placements
 	return optimal_placements
 
 def parse_sam_file(sam_file, ref_seqs):
@@ -168,14 +173,24 @@ def parse_sam_file(sam_file, ref_seqs):
 					sys.exit(1)
 	return aligned_len_map, sam_file_obj
 
-def taxonomic_distance(lineage_1, lineage_2):
+def taxonomic_distance(optimal_lineage, query_lineage):
 	"""
-	calculates the taxonomic distance between two lineages
+	calculates the taxonomic distance between the optimal and query lineage,
+	where optimal_lineage is the starting point of comparison. lineages
+	are represented as lists, where each element is a taxonomic rank. the 
+	highest taxonomic rank is the 0th element, second highest is 1st element, etc.
 
 	@return the taxonomic distance between lineage_1 and lineage_2
 	"""
-	# TODO: implement
-	return 0
+	if not optimal_lineage or not query_lineage:
+		# empty lineages == couldn't assign == return maximum distance
+		return sys.maxsize
+	distance = 0
+	n, m = len(optimal_lineage), len(query_lineage)
+	for i in range(min(n, m)):
+		if optimal_lineage[i] != query_lineage[i]:
+			distance += 1
+	return distance
 
 def reads_over_threshold(reads, threshold):
 	"""
@@ -196,7 +211,7 @@ def calculate_distance(full_ref_lineage, reads_aligned_p, optimal_placement):
 
 	@return a weighted distance between the reference aligned to and the optimal placment
 	"""
-	taxa_distance = taxonomic_distance(full_ref_lineage, optimal_placement)
+	taxa_distance = taxonomic_distance(optimal_placement, full_ref_lineage)
 	reads = reads_over_threshold(reads_aligned_p, 80)
 	return taxa_distance * reads
 
@@ -210,7 +225,7 @@ def main():
 		for line in f:
 			dataset_id, taxonomy = line.strip().split("\t")
 			start_time = time.time()
-			for ref_record in ref_seq_map.values()[0:10]:
+			for ref_record in ref_seq_map.values()[0:50]:
 				dataset_to_lca[dataset_id][ref_record.id] = query_jgi_lca(taxonomy, ref_record.taxonomy)
 			print "done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
 	print "getting optimal placements (deepest LCA) for each dataset..."
@@ -221,7 +236,7 @@ def main():
 		if os.path.isdir(item):
 			for sam_file in list_dir_abs(item):
 				if sam_file.endswith("_top_hits.sam"):
-					all_sam_files.append(parse_sam_file(sam_file))
+					all_sam_files.append(parse_sam_file(sam_file, ref_seq_map))
 	print "calculating distances between each reference aligned to and its lca..."
 	for v in all_sam_files:
 		# TODO: get full lineages of each reference aligned to 
@@ -229,8 +244,14 @@ def main():
 		# multiply by number of reads >= 80% (aligned_len_map in sam_obj)
 		aligned_len_map, sam_obj = v[0], v[1]
 		for ref_id in aligned_len_map:
-			full_ref_lineage = query_jgi_taxa(ref_seq_map[ref_id])
+			full_ref_lineage = query_jgi_taxa(ref_seq_map[ref_id].taxonomy)
+			print "###########################################################"
+			print "full ref aligned to is lineage is: %s" % full_ref_lineage
+			print "optimal placement is: %s" % optimal_placements[sam_obj.dataset_name]
+			print optimal_placements.keys()
 			distance = calculate_distance(full_ref_lineage, aligned_len_map[ref_id], optimal_placements[sam_obj.dataset_name])
+			print "DISTANCE IS: %d" % distance
+			print "###########################################################"
 
 if __name__ == "__main__":
 	main()
