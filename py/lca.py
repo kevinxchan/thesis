@@ -166,7 +166,7 @@ def parse_sam_file(sam_file, ref_seqs):
 				try:
 					ref_id, cigar_string = data[2], data[5]
 				except:
-					print "[query_jgi_lca] WARNING: had a problem with %s, skipping..." % sam_file
+					print "[parse_sam_file] WARNING: had a problem with %s, skipping..." % sam_file
 					continue
 				try:
 					ref_length = len(ref_seqs[ref_id].sequence)
@@ -174,7 +174,7 @@ def parse_sam_file(sam_file, ref_seqs):
 					percent_aligned = float(cigar_len) / ref_length * 100
 					aligned_len_map[ref_id].append(percent_aligned)
 				except KeyError:
-					print "[query_jgi_lca] ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
+					print "[parse_sam_file] ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
 					sys.exit(1)
 	return aligned_len_map, sam_file_obj
 
