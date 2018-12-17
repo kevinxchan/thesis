@@ -30,10 +30,10 @@ class SamFile():
 			return 0
 		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
 
-	def parse_dataset_name(params_line):
+	def parse_dataset_name(self, params_line):
 		dataset_path = params_line.split(" ")[-1]
 		dataset_path = os.path.basename(dataset_path)
-		return os.path.splitext(dataset_path)[0]
+		return os.path.splitext(dataset_path)[0].replace(".fastq", "")
 
 class Histogram():
 
