@@ -13,6 +13,7 @@ USAGE:
 python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
 """
 
+from __future__ import division
 import sys
 import os
 import requests
@@ -130,7 +131,6 @@ def get_longest_lca(dataset_to_lca):
 		depth = -1
 		optimal_placement = []
 		for ref_id in dataset_to_lca[_id]:
-			print ref_id
 			if len(dataset_to_lca[_id][ref_id]) > depth:
 				optimal_placement = dataset_to_lca[_id][ref_id]
 				depth = len(optimal_placement)
@@ -230,7 +230,7 @@ def main():
 		for line in f:
 			dataset_id, taxonomy = line.strip().split("\t")
 			start_time = time.time()
-			for ref_record in ref_seq_map.values()[0:50]:
+			for ref_record in ref_seq_map.values():
 				dataset_to_lca[dataset_id][ref_record.id] = query_jgi_lca(taxonomy, ref_record.taxonomy)
 			print "[main] INFO: done for dataset %s. time elapsed: %ds" % (dataset_id, time.time() - start_time)
 	print "[main] INFO: getting optimal placements (deepest LCA) for each dataset..."
@@ -243,6 +243,7 @@ def main():
 				if sam_file.endswith("_top_hits.sam"): # TODO: may need to make this more flexible
 					all_sam_files.append(parse_sam_file(sam_file, ref_seq_map))
 	print "[main] INFO: calculating distances between each reference aligned to and its lca..."
+	outlines = []
 	for v in all_sam_files:
 		# get full lineages of each reference aligned to 
 		# calculate distance between that and lca
@@ -250,14 +251,28 @@ def main():
 		aligned_len_map, sam_obj = v[0], v[1]
 		for ref_id in aligned_len_map:
 			full_ref_lineage = query_jgi_taxa(ref_seq_map[ref_id].taxonomy)
-			print "###########################################################"
-			print "[main] INFO: full ref aligned to is lineage is: %s" % full_ref_lineage
-			print "[main] INFO: optimal placement is: %s" % optimal_placements[sam_obj.dataset_name]
-			print optimal_placements.keys()
+			# print "###########################################################"
+			# print "[main] INFO: full ref aligned to is lineage is: %s" % full_ref_lineage
+			# print "[main] INFO: optimal placement is: %s" % optimal_placements[sam_obj.dataset_name]
+			# print optimal_placements.keys()
 			distance = calculate_distance(full_ref_lineage, aligned_len_map[ref_id], optimal_placements[sam_obj.dataset_name])
-			print "[main] INFO: DISTANCE IS: %d" % distance
-			print "###########################################################"
-		# TODO: write out to file!
+			# print "[main] INFO: DISTANCE IS: %d" % distance
+			# print "###########################################################"
+			taxa = ref_seq_map[ref_id].taxonomy
+			reads_aligned_p90 = sum(1 for p in aligned_len_map[ref_id] if p >= 80) / len(aligned_len_map[ref_id]) * 100
+			line = [sam_obj.dataset_name, ref_id, sam_obj.params, taxa, str(reads_aligned_p90), str(distance)]
+			outlines.append(line)
+
+	out_header = "ref_id\tparams\ttaxa\treads_aligned_p90\tdistance"	
+	for dataset_id in optimal_placements:
+		outname = dataset_id + ".txt"
+		outfile = open(os.path.join(args.output_dir, outname), "w")
+		outfile.write(out_header + "\n")
+		for line in outlines:
+			if line[0] == dataset_id:
+				outfile.write("\t".join(line[1:]) + "\n")
+		outfile.close()
+	print "[main] INFO: finished script. goodbye."
 
 if __name__ == "__main__":
 	main()
