@@ -39,40 +39,55 @@ echo
 echo "aligning reads with..."
 echo
 
-# echo
-# echo "##################"
-# echo "# DEFAULT PARAMS #"
-# echo "##################"
-# echo
+echo
+echo "##################"
+echo "# DEFAULT PARAMS #"
+echo "##################"
+echo
 
-# while read name; do
-# 	echo "FOR DATASET $name"
-# 	mkdir -p $WORK_DIR/processed/graphmap/$name
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-# 	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --extcigar \
-# 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-# 	-o $WORK_DIR/processed/graphmap/$name/default.sam
-# done < $dataset_names
-
-# echo
-# echo "############################"
-# echo "# DEFAULTS; E-VALUE < 1e-5 #"
-# echo "############################"
-# echo
-
-# while read name; do
-# 	echo "FOR DATASET $name"
-# 	mkdir -p $WORK_DIR/processed/graphmap/$name
-
-# 	$GRAPHMAP align --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
-# 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-# 	-o $WORK_DIR/processed/graphmap/$name/default_eval1e-5.sam
-# done < $dataset_names
+	$GRAPHMAP align --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/default.sam
+done < $dataset_names
 
 echo
-echo "##########################"
-echo "# SG ALG; E-VALUE < 1e-5 #"
-echo "##########################"
+echo "##########"
+echo "# SG ALG #"
+echo "##########"
+echo
+
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+	$GRAPHMAP align --alg sg --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/sg_eval.sam
+done < $dataset_names
+
+echo
+echo "###############"
+echo "# SGGOTOH ALG #"
+echo "###############"
+echo
+
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
+
+	$GRAPHMAP align --alg sg --threads $THREADS -r $reference --index $index_file --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/sggotoh_eval.sam
+done < $dataset_names
+
+echo
+echo "###################"
+echo "# ANCHORGOTOH ALG #"
+echo "###################"
 echo
 
 while read name; do
@@ -81,38 +96,23 @@ while read name; do
 
 	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-	-o $WORK_DIR/processed/graphmap/$name/sg_eval1e-5.sam
+	-o $WORK_DIR/processed/graphmap/$name/anchorgotoh_eval.sam
 done < $dataset_names
 
-# echo
-# echo "##########################"
-# echo "# SGGOTOH ALG; E-VALUE < 1e-5 #"
-# echo "##########################"
-# echo
+echo
+echo "################################"
+echo "# NO MINIMIZERS (-x sensitive) #"
+echo "################################"
+echo
 
-# while read name; do
-# 	echo "FOR DATASET $name"
-# 	mkdir -p $WORK_DIR/processed/graphmap/$name
+while read name; do
+	echo "FOR DATASET $name"
+	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-# 	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
-# 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-# 	-o $WORK_DIR/processed/graphmap/$name/sggotoh_eval1e-5.sam
-# done < $dataset_names
-
-# echo
-# echo "###################################"
-# echo "# ANCHORGOTOH ALG; E-VALUE < 1e-5 #"
-# echo "###################################"
-# echo
-
-# while read name; do
-# 	echo "FOR DATASET $name"
-# 	mkdir -p $WORK_DIR/processed/graphmap/$name
-
-# 	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
-# 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-# 	-o $WORK_DIR/processed/graphmap/$name/anchorgotoh_eval1e-5.sam
-# done < $dataset_names
+	$GRAPHMAP align --threads $THREADS -r $reference -x sensitive --extcigar \
+	--reads $WORK_DIR/raw_data/$name.fastq.gz \
+	-o $WORK_DIR/processed/graphmap/$name/sensitive.sam
+done < $dataset_names
 
 # cd $WORK_DIR
 # echo
