@@ -10,7 +10,7 @@ How it works:
 6. Pick the param set with the most min. number of scores.
 
 USAGE:
-python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
+time python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
 """
 
 from __future__ import division
@@ -259,11 +259,12 @@ def main():
 			# print "[main] INFO: DISTANCE IS: %d" % distance
 			# print "###########################################################"
 			taxa = ref_seq_map[ref_id].taxonomy
-			reads_aligned_p90 = sum(1 for p in aligned_len_map[ref_id] if p >= 80) / len(aligned_len_map[ref_id]) * 100
-			line = [sam_obj.dataset_name, ref_id, sam_obj.params, taxa, str(reads_aligned_p90), str(distance)]
+			num_reads_aligned_p80 = sum(1 for p in aligned_len_map[ref_id] if p >= 80)
+			reads_aligned_p80 = num_reads_aligned_p80 / len(aligned_len_map[ref_id]) * 100
+			line = [sam_obj.dataset_name, ref_id, sam_obj.params, taxa, str(num_reads_aligned_p80), str(reads_aligned_p80), str(distance)]
 			outlines.append(line)
 
-	out_header = "ref_id\tparams\ttaxa\treads_aligned_p90\tdistance"	
+	out_header = "ref_id\tparams\ttaxa\tnum_reads_aligned_p80\treads_aligned_p80\tdistance"	
 	for dataset_id in optimal_placements:
 		outname = dataset_id + ".txt"
 		outfile = open(os.path.join(args.output_dir, outname), "w")
