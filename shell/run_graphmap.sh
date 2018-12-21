@@ -66,7 +66,7 @@ while read name; do
 
 	$GRAPHMAP align --alg sg --threads $THREADS -r $reference --index $index_file --extcigar \
 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-	-o $WORK_DIR/processed/graphmap/$name/sg_eval.sam
+	-o $WORK_DIR/processed/graphmap/$name/sg.sam
 done < $dataset_names
 
 echo
@@ -79,9 +79,9 @@ while read name; do
 	echo "FOR DATASET $name"
 	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-	$GRAPHMAP align --alg sg --threads $THREADS -r $reference --index $index_file --extcigar \
+	$GRAPHMAP align --alg sggotoh --threads $THREADS -r $reference --index $index_file --extcigar \
 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-	-o $WORK_DIR/processed/graphmap/$name/sggotoh_eval.sam
+	-o $WORK_DIR/processed/graphmap/$name/sggotoh.sam
 done < $dataset_names
 
 echo
@@ -94,9 +94,9 @@ while read name; do
 	echo "FOR DATASET $name"
 	mkdir -p $WORK_DIR/processed/graphmap/$name
 
-	$GRAPHMAP align --alg sg --evalue 1e-5 --threads $THREADS -r $reference --index $index_file --extcigar \
+	$GRAPHMAP align --alg anchorgotoh --threads $THREADS -r $reference --index $index_file --extcigar \
 	--reads $WORK_DIR/raw_data/$name.fastq.gz \
-	-o $WORK_DIR/processed/graphmap/$name/anchorgotoh_eval.sam
+	-o $WORK_DIR/processed/graphmap/$name/anchorgotoh.sam
 done < $dataset_names
 
 echo
