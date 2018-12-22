@@ -6,7 +6,7 @@
 # 2. dataset names file (single dataset name per line, stored in .txt file)
 # 3. full path to the reference
 # USAGE: 
-# time /home/kchan/scripts_thesis/shell/run_snap.sh /home/kchan/thesis /home/kchan/thesis/dataset_names.txt /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta
+# time /home/kchan/scripts_thesis/shell/run_snap.sh /home/kchan/thesis /home/kchan/thesis/dataset_names.txt /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta &> snap_log.log
 WORK_DIR=$1
 dataset_names=$2
 reference=$3
