@@ -23,17 +23,11 @@ fi
 cd $WORK_DIR
 index_path=/home/kchan/thesis/indexes/snap
 mkdir -p index_path
-echo "checking for index file..."
-if [ -z "$(ls $index_path)" ]; then
-	printf "not found, building index with seed length 22..."
-	$SNAP index $reference $index_path/s22 -s 22
-	echo "done"
-	printf "not found, building index with seed length 32 (max length)..."
-	$SNAP index $reference $index_path/s32 -keysize 8 -s 32
-	echo "done"
-else
-	echo "found index file, skipping..."
-fi
+
+echo "building index with seed length 22..."
+$SNAP index $reference $index_path/s22 -s 22
+echo "building index with seed length 32 (max length)..."
+$SNAP index $reference $index_path/s32 -keysize 8 -s 32
 
 echo
 echo "aligning reads with..."
