@@ -100,8 +100,6 @@ def parse_sam_file(sam_file, ref_seqs):
 		try:
 			ref_length = len(ref_seqs[ref_id].sequence)
 			percent_aligned = float(cigar_len) / ref_length * 100
-			if percent_aligned == 100.0:
-				print "read %s aligned 100% of reference %s!" % (read_name, ref_id)
 			hist.add_to_bin(sam_file_obj.params, sam_file_obj.dataset_name, ref_id, percent_aligned)
 			sam_file_obj.reads_aligned_per_ref[ref_id] += 1
 			aligned_len_map[ref_id].append(percent_aligned)
