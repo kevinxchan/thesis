@@ -83,7 +83,7 @@ def parse_sam_file(sam_file, ref_seqs):
 					continue
 
 				if read_name not in sam_file_obj.top_hits:
-					if int(mapq) > 0: 
+					if ref_id != "*" and int(mapq) > 0: 
 						sam_file_obj.top_hits[read_name] = data
 					sam_file_obj.num_unique_reads += 1
 				else:
