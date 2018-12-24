@@ -31,13 +31,17 @@ echo "# CREATING DB #"
 echo "###############"
 echo
 
-index_path=/home/kchan/thesis/indexes/last
+index_path=/home/kchan/thesis/indexes/last/YASS
 dbname=$(basename $reference)
 dbname="${dbname%.*}"
 index_file="$index_path/$dbname"
 
-echo "running with params: lastdb -P 8 -u NEAR -R 11"
-$LASTDB -P 8 -u NEAR -R 11 $index_path/$dbname $reference 
+echo "running with params: lastdb -P 8 -u YASS"
+mkdir -p $index_path
+$LASTDB -P 8 -u YASS $index_path/$dbname $reference 
+
+outdir="$WORK_DIR/processed/last/$reference"
+mkdir -p $outdir
 
 echo
 echo "#############################"
@@ -50,9 +54,6 @@ while read name; do
 	echo "FOR DATASET $name"
 	echo
 
-	outdir="$WORK_DIR/processed/last/training_params/"
-	mkdir -p $outdir
-
 	$REFORMAT in=$WORK_DIR/raw_data/$name.fastq.gz out=$WORK_DIR/raw_data/$name.fasta.gz overwrite
 done < $dataset_names
 
@@ -62,17 +63,14 @@ echo "# TRAINING PARAMS #"
 echo "###################"
 echo
 
+mkdir -p $outdir/training_params
+
 while read name; do
 	echo
 	echo "FOR DATASET $name"
 	echo
 
-	outdir="$WORK_DIR/processed/last/training_params/"
-	mkdir -p $outdir
-
-	echo "$WORK_DIR/raw_data/$name.fasta.gz"
-	echo "$index_file"
-	last-train -P8 -D100 $index_file $WORK_DIR/raw_data/$name.fasta.gz > $outdir/"$name".par
+	$LAST_TRAIN -P8 -D100 $index_file $WORK_DIR/raw_data/$name.fasta.gz > $outdir/training_params/$name.par
 done < $dataset_names
 
 echo
@@ -86,7 +84,11 @@ echo "########################"
 echo
 
 while read name; do
-	echo "TODO"
+	echo
+	echo "FOR DATASET $name"
+	echo
+
+	$LASTAL -P8 -f BlastTab+ -p $outdir/training_params/$name.par $index_file $WORK_DIR/raw_data/$name.fasta.gz > $outdir/$name.txt
 done < $dataset_names
 
 cd $CURR_DIR
