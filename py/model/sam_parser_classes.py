@@ -1,5 +1,6 @@
 from collections import defaultdict, OrderedDict
 import os
+import re
 import numpy as np
 import matplotlib 
 matplotlib.use('Agg')
@@ -31,9 +32,14 @@ class SamFile():
 		return round(float(len(self.top_hits)) / self.num_unique_reads * 100, 2)
 
 	def parse_dataset_name(self, params_line):
-		dataset_path = params_line.split(" ")[-1]
-		dataset_path = os.path.basename(dataset_path)
-		return os.path.splitext(dataset_path)[0].replace(".fastq", "")
+		"""
+		parse the dataset name from the @PG header in a given sam file.
+
+		NOTE: this method assumes the data resided in the raw_data subfolder at the time
+		of running the program, and that a fastq file was supplied. the fastq file can
+		either end in ".fastq" or ".fq", and may or may not be gzipped.
+		"""
+		return re.search('raw_data\/(.+)\.f(ast)?q(\.gz)?', params_line).groups(0)[0]
 
 class Histogram():
 
