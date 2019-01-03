@@ -16,6 +16,7 @@ class ReferenceRecord:
 class SamFile():
 
 	def __init__(self):
+		self.software = None
 		self.params = None
 		self.dataset_name = ""
 		self.avg_ref_aligned = {}
