@@ -30,6 +30,7 @@ def get_args():
 	parser.add_argument("-s", "--sample-dir", required = True, help = "Directory containing folders for each sample.")
 	parser.add_argument("-t", "--dataset-taxonomies", required = True, help = "Tab delimited file matching dataset names to their reported taxonomies.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Path to the output directory. [current working directory]")
+	parser.add_argument("-f", "--output-file", default = "lca", help = "Output file name. Extension will be '.txt'. [lca]")	
 	args = parser.parse_args()
 	return args
 
@@ -156,7 +157,10 @@ def parse_sam_file(sam_file, ref_seqs):
 				if line.startswith("@PG"):
 					pg_header = line.split("\t")
 					for col in pg_header:
-						if col.startswith("CL:"):
+						if col.startswith("PN:"):
+							col_stripped = col.rstrip("\n")
+							sam_file_obj.software = col_stripped
+						elif col.startswith("CL:"):
 							col_stripped = col.rstrip("\n")
 							sam_file_obj.dataset_name = sam_file_obj.parse_dataset_name(col_stripped)
 							sam_file_obj.params = col_stripped
@@ -189,7 +193,7 @@ def taxonomic_distance(optimal_lineage, query_lineage):
 	"""
 	if not optimal_lineage or not query_lineage:
 		# empty lineages == couldn't assign == return maximum distance
-		return sys.maxsize
+		return -1
 	distance = 0
 	n, m = len(optimal_lineage), len(query_lineage)
 	for i in range(min(n, m)):
@@ -259,20 +263,26 @@ def main():
 			# print "[main] INFO: DISTANCE IS: %d" % distance
 			# print "###########################################################"
 			taxa = ref_seq_map[ref_id].taxonomy
+			num_reads_aligned_total = len(aligned_len_map[ref_id])
 			num_reads_aligned_p80 = sum(1 for p in aligned_len_map[ref_id] if p >= 80)
-			reads_aligned_p80 = num_reads_aligned_p80 / len(aligned_len_map[ref_id]) * 100
-			line = [sam_obj.dataset_name, ref_id, sam_obj.params, taxa, str(num_reads_aligned_p80), str(reads_aligned_p80), str(distance)]
+			reads_aligned_p80 = num_reads_aligned_p80 / num_reads_aligned_total * 100
+			line = [sam_obj.dataset_name, ref_id, sam_obj.software, sam_obj.params, taxa, str(num_reads_aligned_total), str(num_reads_aligned_p80), str(reads_aligned_p80), str(distance)]
 			outlines.append(line)
 
-	out_header = "ref_id\tparams\ttaxa\tnum_reads_aligned_p80\treads_aligned_p80\tdistance"	
-	for dataset_id in optimal_placements:
-		outname = dataset_id + ".txt"
-		outfile = open(os.path.join(args.output_dir, outname), "w")
-		outfile.write(out_header + "\n")
-		for line in outlines:
-			if line[0] == dataset_id:
-				outfile.write("\t".join(line[1:]) + "\n")
-		outfile.close()
+	out_header = "dataset_id\tref_id\tsoftware\tparams\ttaxa\tnum_reads_aligned_total\tnum_reads_aligned_p80\treads_aligned_p80\tdistance"	
+	outfile = open(os.path.join(args.output_dir, args.output_file + ".txt"), "w")
+	outfile.write(out_header + "\n")
+	for line in outlines:
+		outfile.write("\t".join(line))
+	outfile.close()
+	# for dataset_id in optimal_placements:
+	# 	outname = dataset_id + ".txt"
+	# 	outfile = open(os.path.join(args.output_dir, outname), "w")
+	# 	outfile.write(out_header + "\n")
+	# 	for line in outlines:
+	# 		if line[0] == dataset_id:
+	# 			outfile.write("\t".join(line) + "\n")
+	# 	outfile.close()
 	print "[main] INFO: finished script. goodbye."
 
 if __name__ == "__main__":
