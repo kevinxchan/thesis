@@ -273,7 +273,7 @@ def main():
 	outfile = open(os.path.join(args.output_dir, args.output_file + ".txt"), "w")
 	outfile.write(out_header + "\n")
 	for line in outlines:
-		outfile.write("\t".join(line))
+		outfile.write("\t".join(line) + "\n")
 	outfile.close()
 	# for dataset_id in optimal_placements:
 	# 	outname = dataset_id + ".txt"
