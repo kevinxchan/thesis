@@ -37,7 +37,7 @@ echo
 # build the index. will be stored in index_path
 index_path=/home/kchan/thesis/indexes/graphmap
 $GRAPHMAP align -I -r $reference && mv "$reference".gmidx $index_path 
-mv $index_path/$reference.gmidx $index_path/$marker_gene.gmidx
+mv $index_path/"$(basename $reference)".gmidx $index_path/$marker_gene.gmidx
 index_file=$index_path/"$marker_gene.gmidx"
 
 echo
