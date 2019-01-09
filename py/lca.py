@@ -10,7 +10,7 @@ How it works:
 6. Pick the param set with the most min. number of scores.
 
 USAGE:
-time python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
+time python /home/kchan/scripts_thesis/py/lca.py -r /home/kchan/thesis/references/recA/fungene_9.5.1_recA_nucleotide_uclust99.fasta -s /home/kchan/thesis/processed/minimap2 -t /home/kchan/thesis/dataset_to_taxon.txt
 """
 
 from __future__ import division
@@ -31,6 +31,7 @@ def get_args():
 	parser.add_argument("-t", "--dataset-taxonomies", required = True, help = "Tab delimited file matching dataset names to their reported taxonomies.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Path to the output directory. [current working directory]")
 	parser.add_argument("-f", "--output-file", default = "lca", help = "Output file name. Extension will be '.txt'. [lca]")	
+	parser.add_argument("-m", "--marker-gene", required = True, help = "Name of the marker gene being evaluated.")
 	args = parser.parse_args()
 	return args
 
@@ -259,17 +260,20 @@ def main():
 			# print "[main] INFO: full ref aligned to is lineage is: %s" % full_ref_lineage
 			# print "[main] INFO: optimal placement is: %s" % optimal_placements[sam_obj.dataset_name]
 			# print optimal_placements.keys()
-			distance = calculate_distance(full_ref_lineage, aligned_len_map[ref_id], optimal_placements[sam_obj.dataset_name])
+			
+			cumulative_distance = calculate_distance(full_ref_lineage, aligned_len_map[ref_id], optimal_placements[sam_obj.dataset_name])
+			taxa_distance = taxonomic_distance(full_ref_lineage, optimal_placements[sam_obj.dataset_name])
+
 			# print "[main] INFO: DISTANCE IS: %d" % distance
 			# print "###########################################################"
 			taxa = ref_seq_map[ref_id].taxonomy
 			num_reads_aligned_total = len(aligned_len_map[ref_id])
 			num_reads_aligned_p80 = sum(1 for p in aligned_len_map[ref_id] if p >= 80)
 			reads_aligned_p80 = num_reads_aligned_p80 / num_reads_aligned_total * 100
-			line = [sam_obj.dataset_name, ref_id, sam_obj.software, sam_obj.params, taxa, str(num_reads_aligned_total), str(num_reads_aligned_p80), str(reads_aligned_p80), str(distance)]
+			line = [args.marker_gene, sam_obj.dataset_name, ref_id, sam_obj.software, taxa, str(num_reads_aligned_total), str(num_reads_aligned_p80), str(reads_aligned_p80), str(taxa_distance), str(cumulative_distance)]
 			outlines.append(line)
 
-	out_header = "dataset_id\tref_id\tsoftware\tparams\ttaxa\tnum_reads_aligned_total\tnum_reads_aligned_p80\treads_aligned_p80\tdistance"	
+	out_header = "marker_gene\tdataset_id\tref_id\tsoftware\ttaxa\tnum_reads_aligned_total\tnum_reads_aligned_p80\treads_aligned_p80\ttaxa_distance\tcumulative_distance"	
 	outfile = open(os.path.join(args.output_dir, args.output_file + ".txt"), "w")
 	outfile.write(out_header + "\n")
 	for line in outlines:
