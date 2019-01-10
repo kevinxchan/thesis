@@ -1,6 +1,6 @@
 library(ggplot2)
 library(RColorBrewer)
-library(Rmisc)
+# library(Rmisc)
 library(dplyr)
 library(optparse)
 
@@ -13,62 +13,74 @@ library(optparse)
 #    more code to parse through a directory full of these dataframes and merge them
 # 4. instead of dividing by all totals, group by query dataset too and then divide by this total count.
 
-option_list = list(make_option(c("-i", "--input_table"), type="character", default=NULL,
-                               help="Tab-separated value file output by lca.py", metavar="character"),
+option_list = list(make_option(c("-i", "--input_directory"), type="character", default=NULL,
+                               help="A directory containing tab-separated value files output by lca.py", metavar="character"),
                    make_option(c("-p", "--prefix"), type="character", default=".",
-                               help="Prefix for the output files.", metavar="character"));
+                               help="Prefix for the output files. [current working directory]", metavar="character"));
 
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
-if (is.null(opt$input_table)){
+if (is.null(opt$input_directory)){
   print_help(opt_parser)
-  stop("--input_table must be provided!", call.=FALSE)
+  stop("--input_directory must be provided!", call.=FALSE)
 }
 
 ##
 # For debugging
 ##
-prefix <- "."
-input_table_minimap2 <- "/Users/kevinxchan/Documents/UBC/YEAR4/MICB449/data/lca_scores/recA/recA_minimap2.txt"
-input_table_graphmap <- "/Users/kevinxchan/Documents/UBC/YEAR4/MICB449/data/lca_scores/recA/recA_graphmap.txt"
-opt <- data.frame(input_table_minimap2, input_table_graphmap, prefix, stringsAsFactors = FALSE)
+prefix <- "viz"
+input_directory <- "/Users/kevinxchan/Documents/UBC/YEAR4/MICB449/data/marker_gene_data/"
+opt <- data.frame(input_directory, prefix, stringsAsFactors = FALSE)
 
-spec_out <- paste(opt$prefix, "lca.png", sep='_')
-sens_out <- paste(opt$prefix, "Classification_sensitivity.png", sep='_')
-pdist_out <- paste(opt$prefix, "Classification_WeightedDistance.png", sep='_')
+spec_out <- file.path(opt$prefix, "Proportion_TaxDistance.png")
+pdist_out <- file.path(opt$prefix, "WeightedDistance_MarkerGene.png")
 
-minimap2 <- read.table(opt$input_table_minimap2,
-                      sep="\t", header=TRUE)
-graphmap <- read.table(opt$input_table_graphmap,
-                       sep="\t", header=TRUE)
-acc_dat <- rbind(minimap2, graphmap)
+# start building up acc_dat by scanning through files in directory
+file_names <- list.files(path = opt$input_directory)
 
-lca_header <- c("Dataset", "Reference ID", "Software", "Parameters", "Reference Taxonomy", "Total", "# Aligned Reads >= 80%", "% Reads Aligned >= 80%", "Distance")
-names(acc_dat) <- lca_header
-acc_dat <- select(acc_dat, -Parameters)
+for (file in file_names) {
+  
+  # if the merged dataset doesn't exist, create it
+  if (!exists("acc_dat")) {
+    foo <- file.path(opt$input_directory, file)
+    write(foo, stdout())
+    acc_dat <- read.table(file.path(opt$input_directory, file), header = TRUE, sep = "\t")
+  }
+  
+  # if the merged dataset does exist, append to it
+  if (exists("acc_dat")) {
+    temp_dataset <- read.table(file.path(opt$input_directory, file), header=TRUE, sep="\t")
+    acc_dat <- rbind(acc_dat, temp_dataset)
+    rm(temp_dataset)
+  }
+}
+
+acc_header <- c("MarkerGene", "DatasetID", "ReferenceID", "Software", "ReferenceTaxonomy", "TotalReadsAligned", "NumReadsAlignedOver80", "PercReadsAlignedOver80", "TaxDistance", "CumDistance")
+names(acc_dat) <- acc_header
 acc_dat$Software <- sub("^(PN:)(.*)", "\\2", acc_dat$Software)
 
 ##
 # Figure 1: Rank-exclusion specificity in relation to optimal placement distance
 ##
 sum_software <- acc_dat %>%
-  group_by(Dataset, Software) %>%
-  summarise(TotalBySoftware = sum(Total, na.rm = T))
-tmp <- merge(acc_dat, sum_software, by = c("Dataset", "Software"))
-fig_1 <- tmp %>%
-  select("Software", "Total", "Distance", "TotalBySoftware") %>%
-  group_by(Dataset, Software, Distance) %>%
-  summarise(Total = sum(Total)) %>%
-  filter(Distance >= 0)
-to_plot <- merge(to_plot, sum_software, by = "Software")
-to_plot <- mutate(to_plot, Proportion = Total / TotalBySoftware * 100)
+  group_by(MarkerGene, Software) %>%
+  summarise(TotalBySoftware = sum(TotalReadsAligned, na.rm = T))
 
-filter(to_plot, Distance >= 4) %>% 
+fig_1 <- acc_dat %>%
+  select("MarkerGene", "Software", "TotalReadsAligned", "TaxDistance") %>%
+  group_by(MarkerGene, Software, TaxDistance) %>%
+  summarise(Total = sum(TotalReadsAligned)) %>%
+  filter(TaxDistance >= 0)
+
+tmp <- merge(sum_software, fig_1, by = c("MarkerGene", "Software"))
+fig_1 <- mutate(tmp, Proportion = Total / TotalBySoftware * 100)
+
+filter(fig_1, TaxDistance >= 4) %>% 
   filter(Total > 0)
 pd <- position_dodge(width = 0.75)
 
-ggplot(to_plot, aes(x=Distance, y=Proportion)) +
+ggplot(fig_1, aes(x=TaxDistance, y=Proportion, fill=MarkerGene)) +
   geom_bar(stat="identity", position=pd, colour="black", width = 0.75) +
   facet_wrap(~Software) +
   scale_fill_brewer(palette = "PuOr") +
@@ -96,6 +108,25 @@ harm_dist_dat <- acc_dat %>%
   summarise_at(vars(PlaceDist), funs(sum))
 
 # TODO: break down by dataset
+# sum_software <- acc_dat %>%
+#   group_by(MarkerGene, DatasetID, Software) %>%
+#   summarise(TotalBySoftware = sum(TotalReadsAligned, na.rm = T))
+# 
+# head(acc_dat)
+# 
+# fig_1 <- acc_dat %>%
+#   select("MarkerGene", "DatasetID", "Software", "TotalReadsAligned", "TaxDistance") %>%
+#   group_by(MarkerGene, DatasetID, Software, TaxDistance) %>%
+#   summarise(Total = sum(TotalReadsAligned)) %>%
+#   filter(TaxDistance >= 0)
+# 
+# tmp <- fig_1 %>%
+#   group_by(MarkerGene, DatasetID, Software) %>%
+#   summarise(TotalBySoftwareDataset = sum(Total))
+# 
+# tmp <- merge(tmp, fig_1, by = c("MarkerGene", "DatasetID", "Software"))
+# fig_1 <- mutate(tmp, Proportion = Total / TotalBySoftwareDataset * 100)
+
 ggplot(to_plot, aes(x=Marker, y=Distance)) +
   geom_point(aes(fill=Marker), colour="black",
              shape=21, size=3, alpha=2/3) +
