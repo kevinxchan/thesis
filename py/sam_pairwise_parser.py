@@ -27,7 +27,10 @@ def build_ref_seq_map(fasta_file):
 	with open(fasta_file, "rU") as f:
 		for record in SeqIO.parse(f, "fasta"):
 			_id = record.id
-			taxonomy = record.description.split("organism=")[1].split(",")[0]
+			try:
+				taxonomy = record.description.split("organism=")[1].split(",")[0].strip()
+			except IndexError:
+				taxonomy = record.description.split(" ")[1].replace("[", "").replace("]", "")
 			seq = record.seq
 			ret[_id] = ReferenceRecord(_id, taxonomy, seq)
 	return ret
@@ -106,7 +109,7 @@ def parse_sam_file(sam_file, ref_seqs):
 		except KeyError:
 			print "ERROR: reference id %s found in SAM file but not in the reference FASTA. Did you pass in the correct reference file?" % ref_id
 			sys.exit(1)
-	hist.plot_histograms(os.path.splitext(sam_file)[0], ref_seqs)
+	# hist.plot_histograms(os.path.splitext(sam_file)[0], ref_seqs)
 	for k in aligned_len_map.keys():
 		sam_file_obj.avg_ref_aligned[k] = round(float(sum(aligned_len_map[k])) / len(aligned_len_map[k]), 2)
 
