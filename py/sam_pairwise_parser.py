@@ -30,7 +30,7 @@ def build_ref_seq_map(fasta_file):
 			try:
 				taxonomy = record.description.split("organism=")[1].split(",")[0].strip()
 			except IndexError:
-				taxonomy = record.description.split(" ")[1].replace("[", "").replace("]", "")
+				taxonomy = record.description.split(" ", 1)[1].replace("[", "").replace("]", "")
 			seq = record.seq
 			ret[_id] = ReferenceRecord(_id, taxonomy, seq)
 	return ret
