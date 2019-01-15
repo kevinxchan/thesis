@@ -160,7 +160,7 @@ def parse_sam_file(sam_file, ref_seqs):
 					for col in pg_header:
 						if col.startswith("PN:"):
 							col_stripped = col.rstrip("\n")
-							sam_file_obj.software = col_stripped
+							sam_file_obj.software = col_stripped[3:]
 						elif col.startswith("CL:"):
 							col_stripped = col.rstrip("\n")
 							sam_file_obj.dataset_name = sam_file_obj.parse_dataset_name(col_stripped)
@@ -268,12 +268,13 @@ def main():
 			# print "###########################################################"
 			taxa = ref_seq_map[ref_id].taxonomy
 			num_reads_aligned_total = len(aligned_len_map[ref_id])
+			mean_alignment_length = sum(aligned_len_map[ref_id]) / num_reads_aligned_total
 			num_reads_aligned_p80 = sum(1 for p in aligned_len_map[ref_id] if p >= 80)
 			reads_aligned_p80 = num_reads_aligned_p80 / num_reads_aligned_total * 100
-			line = [args.marker_gene, sam_obj.dataset_name, ref_id, sam_obj.software, taxa, str(num_reads_aligned_total), str(num_reads_aligned_p80), str(reads_aligned_p80), str(taxa_distance), str(cumulative_distance)]
+			line = [args.marker_gene, sam_obj.dataset_name, ref_id, sam_obj.software, taxa, str(mean_alignment_length), str(num_reads_aligned_total), str(num_reads_aligned_p80), str(reads_aligned_p80), str(taxa_distance), str(cumulative_distance)]
 			outlines.append(line)
 
-	out_header = "marker_gene\tdataset_id\tref_id\tsoftware\ttaxa\tnum_reads_aligned_total\tnum_reads_aligned_p80\treads_aligned_p80\ttaxa_distance\tcumulative_distance"	
+	out_header = "marker_gene\tdataset_id\tref_id\tsoftware\ttaxa\tmean_alignment_length\tnum_reads_aligned_total\tnum_reads_aligned_p80\treads_aligned_p80\ttaxa_distance\tcumulative_distance"	
 	outfile = open(os.path.join(args.output_dir, args.output_file + ".txt"), "w")
 	outfile.write(out_header + "\n")
 	for line in outlines:
