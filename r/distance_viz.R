@@ -29,9 +29,9 @@ if (is.null(opt$input_directory)){
 ##
 # For debugging
 ##
-prefix <- "viz"
-input_directory <- "/Users/kevinxchan/Documents/UBC/YEAR4/MICB449/data/marker_gene_data/"
-opt <- data.frame(input_directory, prefix, stringsAsFactors = FALSE)
+# prefix <- "viz"
+# input_directory <- "/Users/kevinxchan/Documents/UBC/YEAR4/MICB449/data/marker_gene_data/"
+# opt <- data.frame(input_directory, prefix, stringsAsFactors = FALSE)
 
 spec_out <- file.path(opt$prefix, "Proportion_TaxDistance.png")
 pdist_out <- file.path(opt$prefix, "WeightedDistance_MarkerGene.png")
@@ -56,7 +56,7 @@ for (file in file_names) {
   }
 }
 
-acc_header <- c("MarkerGene", "DatasetID", "ReferenceID", "Software", "ReferenceTaxonomy", "TotalReadsAligned", "NumReadsAlignedOver80", "PercReadsAlignedOver80", "TaxDistance", "CumDistance")
+acc_header <- c("MarkerGene", "DatasetID", "ReferenceID", "Software", "ReferenceTaxonomy", "MeanAlignmentPercentage", "TotalReadsAligned", "NumReadsAlignedOver80", "PercReadsAlignedOver80", "TaxDistance", "CumDistance")
 names(acc_dat) <- acc_header
 acc_dat$Software <- sub("^(PN:)(.*)", "\\2", acc_dat$Software)
 
@@ -67,11 +67,14 @@ sum_software <- acc_dat %>%
   group_by(MarkerGene, Software) %>%
   summarise(TotalBySoftware = sum(TotalReadsAligned, na.rm = T))
 
+nrow(acc_dat %>% filter(MeanAlignmentPercentage < 20))
+
 fig_1 <- acc_dat %>%
-  select("MarkerGene", "Software", "TotalReadsAligned", "TaxDistance") %>%
+  filter(MeanAlignmentPercentage >= 20) %>%
+  filter(TaxDistance >= 0) %>%
+  select("MarkerGene", "Software", "MeanAlignmentPercentage", "TotalReadsAligned", "TaxDistance") %>%
   group_by(MarkerGene, Software, TaxDistance) %>%
-  summarise(Total = sum(TotalReadsAligned)) %>%
-  filter(TaxDistance >= 0)
+  summarise(Total = sum(TotalReadsAligned))
 
 tmp <- merge(sum_software, fig_1, by = c("MarkerGene", "Software"))
 fig_1 <- mutate(tmp, Proportion = Total / TotalBySoftware * 100)
@@ -96,7 +99,6 @@ ggsave(filename = spec_out, width = 10, height = 6, dpi = 400)
 ##
 # Figure 2: The taxonomic-hazard-weighted classification scores
 ##
-to_plot <- mutate(to_plot, Marker = "recA")
 
 harm_dist_dat <- acc_dat %>% 
   filter(Proportion > 0) %>% 
@@ -108,27 +110,25 @@ harm_dist_dat <- acc_dat %>%
   summarise_at(vars(PlaceDist), funs(sum))
 
 # TODO: break down by dataset
-# sum_software <- acc_dat %>%
-#   group_by(MarkerGene, DatasetID, Software) %>%
-#   summarise(TotalBySoftware = sum(TotalReadsAligned, na.rm = T))
-# 
-# head(acc_dat)
-# 
-# fig_1 <- acc_dat %>%
-#   select("MarkerGene", "DatasetID", "Software", "TotalReadsAligned", "TaxDistance") %>%
-#   group_by(MarkerGene, DatasetID, Software, TaxDistance) %>%
-#   summarise(Total = sum(TotalReadsAligned)) %>%
-#   filter(TaxDistance >= 0)
-# 
-# tmp <- fig_1 %>%
-#   group_by(MarkerGene, DatasetID, Software) %>%
-#   summarise(TotalBySoftwareDataset = sum(Total))
-# 
-# tmp <- merge(tmp, fig_1, by = c("MarkerGene", "DatasetID", "Software"))
-# fig_1 <- mutate(tmp, Proportion = Total / TotalBySoftwareDataset * 100)
+sum_software_by_dataset <- acc_dat %>%
+  group_by(MarkerGene, DatasetID, Software) %>%
+  summarise(TotalBySoftwareDataset = sum(TotalReadsAligned, na.rm = T))
 
-ggplot(to_plot, aes(x=Marker, y=Distance)) +
-  geom_point(aes(fill=Marker), colour="black",
+fig_3 <- acc_dat %>%
+  select("MarkerGene", "DatasetID", "Software", "TotalReadsAligned", "TaxDistance", "CumDistance") #%>%
+  # group_by(MarkerGene, DatasetID, Software, CumDistance) %>%
+  # summarise(Total = sum(TotalReadsAligned)) %>%
+  # filter(TaxDistance >= 0)
+
+tmp <- fig_1 %>%
+  group_by(MarkerGene, DatasetID, Software) %>%
+  summarise(TotalBySoftwareDataset = sum(Total))
+
+tmp <- merge(tmp, fig_1, by = c("MarkerGene", "DatasetID", "Software"))
+fig_1 <- mutate(tmp, Proportion = Total / TotalBySoftwareDataset * 100)
+
+ggplot(fig_3, aes(x=MarkerGene, y=CumDistance)) +
+  geom_point(aes(fill=MarkerGene), colour="black",
              shape=21, size=3, alpha=2/3) +
   scale_fill_brewer(palette = "PuOr") +
   facet_wrap(~Software) +
