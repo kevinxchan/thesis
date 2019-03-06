@@ -13,10 +13,11 @@ import logging
 import requests
 from collections import defaultdict
 from argparse import ArgumentParser
+from util.file_utils import list_dir_abs
 
 def get_args():
 	parser = ArgumentParser(description = "Script to gather CTD per marker genes, so a scatter plot of CTD vs marker gene can be made.")
-	parser.add_argument("-s", "--sample-dir", required = False, help = "Directory containing folders for each sample.")
+	parser.add_argument("-s", "--sample-dir", required = True, help = "Directory containing folders for each sample.")
 	parser.add_argument("-t", "--dataset-taxonomies", required = True, help = "Tab delimited file matching dataset names to their reported taxonomies.")
 	parser.add_argument("-d", "--data-dir", required = True, help = "Directory containing the tax ids for each marker gene. Should be in the $TreeSAPP directory.")	
 	parser.add_argument("-m", "--marker-genes", required = True, help = "Comma delimited list of marker genes tested.")	
@@ -38,6 +39,24 @@ def read_placements(placements_file):
 		for line in f:
 			_id, marker, lineage = line.strip().split("\t")
 			d[_id][marker] = lineage
+	return d
+
+def read_sample_dir(sample_dir):
+	d = defaultdict(dict)
+	for item in list_dir_abs(sample_dir):
+		if os.path.isdir(item):
+			try:
+				with open(os.path.join(item, "final_outputs", "marker_contig_map.tsv"), "r") as infile:
+					for i, line in enumerate(infile):
+						if i == 0:
+							# header, skip
+							continue
+						else:
+							line = line.strip().split("\t")
+							sample, marker, confident_taxa = line[0], line[2], line[5]
+							d[sample][marker] = confident_taxa
+			except IOError:
+				logging.warning("directory {} doesn't appear to be an output from TreeSAPP, skipping...".format(item))
 	return d
 
 def get_dataset_lineages(dataset_to_taxon):
@@ -101,6 +120,7 @@ def main():
 	args = get_args()
 	cached_lineages = os.path.join(args.output_dir, "full_dataset_lineages.txt")
 
+	# read in full lineages for each dataset
 	if os.path.isfile(cached_lineages):
 		logging.info("found file mapping dataset ids to full lineages in output directory, reading...")
 		full_dataset_lineage = read_lineages(cached_lineages)
@@ -110,6 +130,7 @@ def main():
 		write_full_lineages(full_dataset_lineage, args.output_dir)
 	logging.info("done.")
 
+	# gather optimal placements for each dataset, and each marker gene
 	cached_optimal_placements = os.path.join(args.output_dir, "optimal_placements.txt")
 	if os.path.isfile(cached_optimal_placements):
 		logging.info("found file mapping dataset ids to optimal placements for each marker, reading...")
@@ -126,7 +147,11 @@ def main():
 		logging.info("writing optimal placements to disk...")
 		write_optimal_placements(dataset_optimal_placement, args.output_dir)
 	logging.info("done.")
-	print(dataset_optimal_placement)
+
+	# parse info from marker contig map files
+	args.sample_dir = os.path.abspath(args.sample_dir)
+	marker_contig_map = read_sample_dir(args.sample_dir)
+	print(marker_contig_map)
 	
 	logging.info("\n###### DONE. GOODBYE ######\n")
 if __name__ == "__main__":
