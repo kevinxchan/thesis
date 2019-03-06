@@ -28,8 +28,16 @@ def read_lineages(lineage_file):
 	d = {}
 	with open(lineage_file, "r") as f:
 		for line in f:
-			_id, lineage = line.split("\t")
+			_id, lineage = line.strip().split("\t")
 			d[_id] = lineage
+	return d
+
+def read_placements(placements_file):
+	d = defaultdict(dict)
+	with open(placements_file, "r") as f:
+		for line in f:
+			_id, marker, lineage = line.strip().split("\t")
+			d[_id][marker] = lineage
 	return d
 
 def get_dataset_lineages(dataset_to_taxon):
@@ -45,6 +53,12 @@ def write_full_lineages(full_dataset_lineage, outdir):
 	outfile = open(os.path.join(outdir, "full_dataset_lineages.txt"), "w")
 	for _id, lineage in full_dataset_lineage.items():
 		outfile.write("{}\t{}\n".format(_id, lineage))
+
+def write_optimal_placements(placements, outdir):
+	outfile = open(os.path.join(outdir, "optimal_placements.txt"), "w")
+	for _id in placements:
+		for marker in placements[_id]:
+			outfile.write("{}\t{}\t{}\n".format(_id, marker, placements[_id][marker]))
 
 def query_jgi_taxa(query):
 	url = "http://taxonomy.jgi-psf.org/name/sc"
@@ -78,7 +92,7 @@ def get_deepest_lca(dataset_lineage, reference_lineage):
 	for i in range(min(len(l1), len(l2))):
 		if l1[i] == l2[i]:
 			depth += 1
-			lca = l1[:i]
+			lca = l1[:i+1]
 	return depth, "; ".join(lca)
 
 def main():
@@ -96,16 +110,24 @@ def main():
 		write_full_lineages(full_dataset_lineage, args.output_dir)
 	logging.info("done.")
 
-	markers = args.marker_genes.split(",")
-	dataset_optimal_placement = defaultdict(dict)
-	for dataset in full_dataset_lineage:
-		logging.info("getting optimal placements for dataset {}...".format(dataset))
-		for marker in markers:
-			path_to_marker = os.path.join(args.data_dir, "tax_ids_{}.txt".format(marker))
-			dataset_optimal_placement[dataset][marker] = get_optimal_placements(full_dataset_lineage[dataset], path_to_marker)
-			logging.info("...done for marker gene: {}.".format(marker))
-	
+	cached_optimal_placements = os.path.join(args.output_dir, "optimal_placements.txt")
+	if os.path.isfile(cached_optimal_placements):
+		logging.info("found file mapping dataset ids to optimal placements for each marker, reading...")
+		dataset_optimal_placement = read_placements(cached_optimal_placements)
+	else:
+		markers = args.marker_genes.split(",")
+		dataset_optimal_placement = defaultdict(dict)
+		for dataset in full_dataset_lineage:
+			logging.info("getting optimal placements for dataset {}...".format(dataset))
+			for marker in markers:
+				path_to_marker = os.path.join(args.data_dir, "tax_ids_{}.txt".format(marker))
+				dataset_optimal_placement[dataset][marker] = get_optimal_placements(full_dataset_lineage[dataset], path_to_marker)
+				logging.info("...done for marker gene: {}.".format(marker))
+		logging.info("writing optimal placements to disk...")
+		write_optimal_placements(dataset_optimal_placement, args.output_dir)
+	logging.info("done.")
 	print(dataset_optimal_placement)
+	
 	logging.info("\n###### DONE. GOODBYE ######\n")
 if __name__ == "__main__":
 	main()
