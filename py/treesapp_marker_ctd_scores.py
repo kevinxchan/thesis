@@ -78,11 +78,12 @@ def get_deepest_lca(dataset_lineage, reference_lineage):
 	for i in range(min(len(l1), len(l2))):
 		if l1[i] == l2[i]:
 			depth += 1
-			lca = l1[i]
-	return depth, lca
+			lca = l1[:i]
+	return depth, "; ".join(lca)
 
 def main():
 	logging.basicConfig(level = logging.DEBUG)
+	logging.info("\n###### STARTING SCRIPT ######\n")
 	args = get_args()
 	cached_lineages = os.path.join(args.output_dir, "full_dataset_lineages.txt")
 
@@ -93,7 +94,7 @@ def main():
 		logging.info("gathering full lineages for each dataset...")
 		full_dataset_lineage = get_dataset_lineages(args.dataset_taxonomies)
 		write_full_lineages(full_dataset_lineage, args.output_dir)
-	logging.info("done.\n")
+	logging.info("done.")
 
 	markers = args.marker_genes.split(",")
 	dataset_optimal_placement = defaultdict(dict)
@@ -103,7 +104,8 @@ def main():
 			path_to_marker = os.path.join(args.data_dir, "tax_ids_{}.txt".format(marker))
 			dataset_optimal_placement[dataset][marker] = get_optimal_placements(full_dataset_lineage[dataset], path_to_marker)
 			logging.info("...done for marker gene: {}.".format(marker))
+	
 	print(dataset_optimal_placement)
-
+	logging.info("\n###### DONE. GOODBYE ######\n")
 if __name__ == "__main__":
 	main()
