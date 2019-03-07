@@ -42,7 +42,7 @@ def read_placements(placements_file):
 	return d
 
 def read_sample_dir(sample_dir):
-	d = defaultdict(dict)
+	d = defaultdict(lambda: defaultdict(list))
 	for item in list_dir_abs(sample_dir):
 		if os.path.isdir(item):
 			try:
@@ -54,7 +54,7 @@ def read_sample_dir(sample_dir):
 						else:
 							line = line.strip().split("\t")
 							sample, marker, confident_taxa = line[0], line[2], line[5]
-							d[sample][marker] = confident_taxa
+							d[sample][marker].append(confident_taxa)
 			except IOError:
 				logging.warning("directory {} doesn't appear to be an output from TreeSAPP, skipping...".format(item))
 	return d
@@ -78,6 +78,12 @@ def write_optimal_placements(placements, outdir):
 	for _id in placements:
 		for marker in placements[_id]:
 			outfile.write("{}\t{}\t{}\n".format(_id, marker, placements[_id][marker]))
+
+def write_final_scores(scores, outdir):
+	outfile = open(os.path.join(outdir, "ctd_scores.txt"), "w")
+	outfile.write("Dataset\tMarker\tCTD_score\n")
+	for score_line in scores:
+		outfile.write("\t".join(map(str, score_line)) + "\n")
 
 def query_jgi_taxa(query):
 	url = "http://taxonomy.jgi-psf.org/name/sc"
@@ -114,6 +120,33 @@ def get_deepest_lca(dataset_lineage, reference_lineage):
 			lca = l1[:i+1]
 	return depth, "; ".join(lca)
 
+def calculate_scores(dataset_optimal_placement, marker_contig_map):
+	"""
+	calculate final CTD scores for each dataset, for each marker gene.
+	algorithm:
+	1. lca_distance = (length of optimal distance) - (length of placement)
+	2. sum number of reads which aligned with distance 'lca_distance' --> P
+	3. calculate proportion = P / total number of reads aligned for a dataset
+	4. CTD = sum proportion * lca_distance
+	"""
+	ret = []
+	for _id in marker_contig_map:
+		total_reads_aligned = sum(len(x) for x in marker_contig_map[_id].values())
+		for marker in marker_contig_map[_id]:
+			ctd_accumulator = defaultdict(int)
+			curr_optimal_placement = dataset_optimal_placement[_id][marker]
+			for curr_marker_lineage in marker_contig_map[_id][marker]:
+				depth, lca = get_deepest_lca(curr_marker_lineage, curr_optimal_placement)
+				lca_distance = len(curr_optimal_placement.split("; ")) - depth
+				ctd_accumulator[lca_distance] += 1
+
+			CTD = 0
+			for dist, num_reads_aligned in ctd_accumulator.items():
+				weighted_score = dist * (num_reads_aligned / total_reads_aligned)
+				CTD += weighted_score
+			ret.append([_id, marker, CTD])
+	return ret
+
 def main():
 	logging.basicConfig(level = logging.DEBUG)
 	logging.info("\n###### STARTING SCRIPT ######\n")
@@ -149,9 +182,17 @@ def main():
 	logging.info("done.")
 
 	# parse info from marker contig map files
+	logging.info("parsing through marker contig maps and calculating CTD...")
 	args.sample_dir = os.path.abspath(args.sample_dir)
 	marker_contig_map = read_sample_dir(args.sample_dir)
-	print(marker_contig_map)
+	final_scores = calculate_scores(dataset_optimal_placement, marker_contig_map)
+	write_final_scores(final_scores, args.output_dir)
+	logging.info("done.")
+
+	logging.info("FINAL OUTPUT:\n")
+	print("DATASET\tMARKER\tCTD")
+	for score_line in final_scores:
+		print("\t".join(map(str, score_line)))
 	
 	logging.info("\n###### DONE. GOODBYE ######\n")
 if __name__ == "__main__":
