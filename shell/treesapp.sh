@@ -11,6 +11,7 @@ dataset_names=$1
 treesapp_dir=$2
 input_dir=$3
 out_dir=$4
+
 THREADS=12
 
 if [[ -z $1 || -z $2 || -z $3 || -z $4 ]]; then
@@ -18,16 +19,19 @@ if [[ -z $1 || -z $2 || -z $3 || -z $4 ]]; then
 	exit 1
 fi
 
+echo
 echo "dataset names: $1"
 echo "TreeSAPP directory: $2"
 echo "input directory: $3"
 echo "output directory: $4"
+echo
 
 mkdir -p $out_dir
 source activate py36
 
 while read name; do
-	mkdir -p $out_dir/$name
+	mkdir -p "$out_dir"/"$name"
 
-	$treesapp_dir/treesapp.py -i $input_dir/$name.fastq --lr --molecule dna -o $out_dir/$name -T $THREADS --overwrite
+	$treesapp_dir/treesapp.py -i $input_dir/$name.fastq \
+	--lr --molecule dna -o $out_dir/$name -T $THREADS --overwrite
 done < $dataset_names
