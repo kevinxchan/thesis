@@ -11,6 +11,7 @@ then for M, and a dataset, CTD = sum d * p. therefore, a single data point repre
 import os
 import logging
 import requests
+import sys
 from collections import defaultdict
 from argparse import ArgumentParser
 from util.file_utils import list_dir_abs
@@ -97,14 +98,14 @@ def clean_lineage(jgi_lineage):
 		if ":" in rank:
 			rank = rank.split(":")[1]
 			cleaned_lineage.append(rank)
-	return "; ".join(cleaned_lineage)
+	return "Root; " + "; ".join(cleaned_lineage)
 
 def get_optimal_placements(full_dataset_lineage, marker_file):
 	depth = -1
 	with open(marker_file, "r") as infile: 
 		for line in infile:
 			line = line.strip().split("\t")
-			reference_lineage = line[2]
+			reference_lineage = "Root; " + line[2]
 			curr_depth, lca = get_deepest_lca(full_dataset_lineage, reference_lineage)
 			if depth == -1 or curr_depth > depth:
 				optimal_placement = lca
@@ -138,10 +139,14 @@ def calculate_scores(dataset_optimal_placement, marker_contig_map):
 			for curr_marker_lineage in marker_contig_map[_id][marker]:
 				depth, lca = get_deepest_lca(curr_marker_lineage, curr_optimal_placement)
 				lca_distance = len(curr_optimal_placement.split("; ")) - depth
+				# logging.debug("_id: {}, marker: {}".format(_id, marker))
+				# logging.debug("optimal length: {}, depth: {}".format(len(curr_optimal_placement.split("; ")), depth))
+				# logging.debug("optimal p: {}, lca: {}".format(curr_optimal_placement, lca))
 				ctd_accumulator[lca_distance] += 1
 
 			CTD = 0
 			for dist, num_reads_aligned in ctd_accumulator.items():
+				logging.debug("dataset: {}, marker: {}, dist: {}, num_reads_aligned: {}, total_reads_aligned: {}".format(_id, marker, dist, num_reads_aligned, total_reads_aligned))
 				weighted_score = dist * (num_reads_aligned / total_reads_aligned)
 				CTD += weighted_score
 			ret.append([_id, marker, CTD])
