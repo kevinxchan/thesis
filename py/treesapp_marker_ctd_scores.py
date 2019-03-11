@@ -132,19 +132,16 @@ def calculate_scores(dataset_optimal_placement, marker_contig_map):
 	"""
 	ret = []
 	for _id in marker_contig_map:
-		total_reads_aligned = sum(len(x) for x in marker_contig_map[_id].values())
 		for marker in marker_contig_map[_id]:
 			ctd_accumulator = defaultdict(int)
 			curr_optimal_placement = dataset_optimal_placement[_id][marker]
 			for curr_marker_lineage in marker_contig_map[_id][marker]:
 				depth, lca = get_deepest_lca(curr_marker_lineage, curr_optimal_placement)
 				lca_distance = len(curr_optimal_placement.split("; ")) - depth
-				# logging.debug("_id: {}, marker: {}".format(_id, marker))
-				# logging.debug("optimal length: {}, depth: {}".format(len(curr_optimal_placement.split("; ")), depth))
-				# logging.debug("optimal p: {}, lca: {}".format(curr_optimal_placement, lca))
 				ctd_accumulator[lca_distance] += 1
 
 			CTD = 0
+			total_reads_aligned = len(marker_contig_map[_id][marker])
 			for dist, num_reads_aligned in ctd_accumulator.items():
 				logging.debug("dataset: {}, marker: {}, dist: {}, num_reads_aligned: {}, total_reads_aligned: {}".format(_id, marker, dist, num_reads_aligned, total_reads_aligned))
 				weighted_score = dist * (num_reads_aligned / total_reads_aligned)
