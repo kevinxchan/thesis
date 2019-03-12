@@ -14,8 +14,10 @@ FN = read which was not aligned in TreeSAPP, but was in minimap2
 import os
 import logging
 import sys
+from math import sqrt
 from collections import defaultdict
 from argparse import ArgumentParser
+from Bio import SeqIO
 from util.file_utils import list_dir_abs
 from util.jgi_utils import query_jgi_taxa
 from model.mock_analysis_classes import *
@@ -27,6 +29,9 @@ def get_args():
 	parser.add_argument("-t", "--dataset-taxonomies", required = True, help = "Tab delimited file matching dataset names to their reported taxonomies.")
 	parser.add_argument("-d", "--data-dir", required = True, help = "Directory containing the tax ids for each marker gene. Should be in the $TreeSAPP directory.")	
 	parser.add_argument("-m", "--marker-genes", required = True, help = "Comma delimited list of marker genes tested.")	
+	parser.add_argument("--raw-data", required = True, help = "Path to raw FASTQ mock community data.")
+	parser.add_argument("--treesapp-hits", required = True, help = "Path to the TreeSAPP marker_contig_map.tsv file.")
+	parser.add_argument("--max-taxa-distance", required = True, help = "Maximum taxonomic distance allowed before counting as a false positive.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Path to the output directory.")
 	args = parser.parse_args()
 	return args
@@ -82,6 +87,37 @@ def read_marker_overlaps(marker_gene_overlaps):
 			d[query_name] = Overlap(query_name, gene, reference_name, optimal_placement)
 	return d
 
+def readfq(fp): # this is a generator function
+    last = None # this is a buffer keeping the last unprocessed line
+    while True: # mimic closure; is it a bad idea?
+        if not last: # the first record or a record following a fastq
+            for l in fp: # search for the start of the next record
+                if l[0] in '>@': # fasta/q header line
+                    last = l[:-1] # save this line
+                    break
+        if not last: break
+        name, seqs, last = last[1:].partition(" ")[0], [], None
+        for l in fp: # read the sequence
+            if l[0] in '@+>':
+                last = l[:-1]
+                break
+            seqs.append(l[:-1])
+        if not last or last[0] != '+': # this is a fasta record
+            yield name, ''.join(seqs), None # yield a fasta record
+            if not last: break
+        else: # this is a fastq record
+            seq, leng, seqs = ''.join(seqs), 0, []
+            for l in fp: # read the quality
+                seqs.append(l[:-1])
+                leng += len(l) - 1
+                if leng >= len(seq): # have read enough quality
+                    last = None
+                    yield name, seq, ''.join(seqs); # yield a fastq record
+                    break
+            if last: # reach EOF before reading enough quality
+                yield name, seq, None # yield a fasta record instead
+                break
+
 def get_dataset_lineages(dataset_to_taxon):
 	ret = {}
 	with open(dataset_to_taxon, "r") as infile:
@@ -90,6 +126,18 @@ def get_dataset_lineages(dataset_to_taxon):
 			full_taxa_string = query_jgi_taxa(taxa_string)
 			ret[dataset_accession] = full_taxa_string
 	return ret
+
+def read_marker_contig_map(marker_contig_map):
+	d = {}
+	with open(marker_contig_map, "r") as infile:
+		for line in infile:
+			line = line.strip().split("\t")
+			query_name = line[1].split("_")[0]
+			marker = line[2]
+			confident_taxa = line[5]
+			mcm = MarkerContigMap(query_name, marker, confident_taxa)
+			d[query_name] = mcm
+	return d
 
 def write_full_lineages(full_dataset_lineage, outdir):
 	outfile = open(os.path.join(outdir, "full_dataset_lineages.txt"), "w")
@@ -136,6 +184,13 @@ def get_deepest_lca(dataset_lineage, reference_lineage):
 			depth += 1
 			lca = l1[:i+1]
 	return depth, "; ".join(lca)
+
+def get_read_names(mock_fastq):
+	s = set()
+	file = open(mock_fastq, "r")
+	for name, _, _ in readfq(file):
+		s.add(name)
+	return s
 
 def check_for_marker(description):
 	"""
@@ -219,6 +274,47 @@ def find_overlaps(minimap2_hits, gff_hits):
 					marker_genes[single_alignment.qname] = Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.optimal_lineage)
 	return marker_genes
 
+def within_taxa_distance(query_taxa, optimal_taxa, max_dist):
+	query = query_taxa.split("; ")
+	optimal = optimal_taxa.split("; ")
+	distance = 0
+	for i in range(max(len(query), len(optimal))):
+		if i >= len(query) or i >= len(optimal):
+			distance += 1
+		else:
+			if query[i] != optimal[i]:
+				distance += 1
+	return distance <= max_dist
+
+def calculate_positives(marker_contig_map, marker_genes, max_taxa_dist):
+	tp = fp = 0
+	for mcm_obj in marker_contig_map.values():
+			if mcm_obj.query_name not in marker_genes:
+				fp += 1
+			else:
+				true_marker = marker_genes[mcm_obj.query_name]
+				if true_marker.gene != mcm_obj.marker or not within_taxa_distance(mcm_obj.confident_taxonomy, true_marker.optimal_placement, max_taxa_dist):
+					fp += 1
+				elif true_marker.gene == mcm_obj.marker and within_taxa_distance(mcm_obj.confident_taxonomy, true_marker.optimal_placement, max_taxa_dist):
+					tp += 1
+				else:
+					print(mcm_obj.marker, mcm_obj.confident_taxonomy, true_marker.optimal_placement)
+
+	return (tp, fp)
+
+def calculate_negatives(marker_contig_map, marker_genes, all_read_names_set):
+	treesapp_identified = set(marker_contig_map.keys())
+	true_marker_genes = set(marker_genes.keys())
+	true_negative_read_names = all_read_names_set.difference(true_marker_genes)
+	false_negative_read_names = true_marker_genes.difference(treesapp_identified)
+	tn, fn = len(true_negative_read_names), len(false_negative_read_names)
+	return (tn, fn)
+
+def calculate_MCC(tp, fp, tn, fn):
+	numerator = (tp * tn) - (fp * fn)
+	denominator = sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+	return numerator / denominator
+
 def main():
 	logging.basicConfig(level = logging.DEBUG)
 	logging.info("\n###### STARTING SCRIPT ######\n")
@@ -281,12 +377,37 @@ def main():
 		write_marker_gene_overlaps(marker_genes, args.output_dir)
 		logging.info("done.")
 
-	# logging.info("parsing through marker contig map and calculating MCC...")
-	# args.sample_dir = os.path.abspath(args.sample_dir)
-	# marker_contig_map = read_sample_dir(args.sample_dir)
+	logging.info("parsing through marker contig map...")
+	marker_contig_map = os.path.abspath(args.treesapp_hits)
+	marker_contig_map = read_marker_contig_map(marker_contig_map)
 	logging.info("done.")
 
-	logging.info("FINAL OUTPUT:\n")
+	logging.info("parsing through fastq mock community and extracting read names...")
+	mock_fastq = os.path.abspath(args.raw_data)
+	all_read_names_set = get_read_names(mock_fastq)
+	logging.info("done.")
+	
+	max_taxa_dist = int(args.max_taxa_distance)
+	logging.info("counting true positives and false positives...")
+	tp, fp = calculate_positives(marker_contig_map, marker_genes, max_taxa_dist)
+	logging.info("done.")
+
+	logging.info("counting true negatives and false negatives...")
+	tn, fn = calculate_negatives(marker_contig_map, marker_genes, all_read_names_set)
+	logging.info("done.")
+
+	logging.info("calculating MCC...")
+	MCC = calculate_MCC(tp, fp, tn, fn)
+	logging.info("done.")
+
+	print()
+	print("FINAL OUTPUT:")
+	print("TRUE POSITIVES: {}".format(tp))
+	print("FALSE POSITIVES: {}".format(fp))
+	print("TRUE NEGATIVES: {}".format(tn))
+	print("FALSE NEGATIVES: {}".format(fn))
+	print()
+	print("MCC: {}".format(MCC))
 	
 	logging.info("\n###### DONE. GOODBYE ######\n")
 if __name__ == "__main__":

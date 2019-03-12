@@ -41,3 +41,10 @@ class Overlap:
 	def __str__(self):
 		return "query name: {}\nmarker gene: {}\nreference name: {}\noptimal placement: {}".format(
 			self.query_name, self.gene, self.reference_name, self.optimal_placement)
+
+class MarkerContigMap:
+
+	def __init__(self, query_name, marker, confident_taxonomy):
+		self.query_name = query_name
+		self.marker = marker
+		self.confident_taxonomy = confident_taxonomy
