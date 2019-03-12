@@ -69,8 +69,8 @@ def read_parsed_gffs(parsed_gffs_file):
 	d = defaultdict(list)
 	with open(parsed_gffs_file, "r") as f:
 		for line in f:
-			hit_name, start, stop, strand, ref_gene, ref_name, full_lineage = line.strip().split("\t")
-			gff_line = GFFLine(hit_name, int(start), int(stop), strand, ref_gene, ref_name, full_lineage)
+			hit_name, start, stop, strand, ref_gene, ref_name, optimal_lineage = line.strip().split("\t")
+			gff_line = GFFLine(hit_name, int(start), int(stop), strand, ref_gene, ref_name, optimal_lineage)
 			d[hit_name].append(gff_line)
 	return d
 
@@ -114,7 +114,7 @@ def write_parsed_gffs(parsed_gffs_file, output_dir):
 		for gff_line in v:
 			outfile.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
 				gff_line.hit_name, gff_line.start, gff_line.stop, gff_line.strand, gff_line.ref_gene, 
-				gff_line.ref_name, gff_line.full_lineage))
+				gff_line.ref_name, gff_line.optimal_lineage))
 
 def get_optimal_placements(full_dataset_lineage, marker_file):
 	depth = -1
@@ -156,9 +156,9 @@ def check_for_marker(description):
 			return ("pyrG", True)
 	return ("", False)
 
-def parse_gffs(reference_path, full_dataset_lineage):
+def parse_gffs(reference_path, dataset_optimal_placement):
 	d = defaultdict(list)
-	for reference in full_dataset_lineage:
+	for reference in dataset_optimal_placement:
 		ref_org_path = os.path.join(reference_path, reference)
 		for f in list_dir_abs(ref_org_path):
 			if f.endswith(".gff"):
@@ -175,7 +175,7 @@ def parse_gffs(reference_path, full_dataset_lineage):
 							hit_name, start, stop, strand, desc = line[0], int(line[3]), int(line[4]), line[6], line[8]
 							ref_gene, contains_marker = check_for_marker(desc)
 							if contains_marker:
-								gff_line = GFFLine(hit_name, start-1, stop-1, strand, ref_gene, reference, full_dataset_lineage[reference])
+								gff_line = GFFLine(hit_name, start-1, stop-1, strand, ref_gene, reference, dataset_optimal_placement[reference][ref_gene])
 								d[hit_name].append(gff_line)
 	return d
 
@@ -216,7 +216,7 @@ def find_overlaps(minimap2_hits, gff_hits):
 			for marker_hit in gff_hits[hit_name]:
 				ref_start, ref_stop = marker_hit.start, marker_hit.stop
 				if (t_start < ref_stop and t_stop > ref_start) or (ref_start < t_stop and ref_stop > t_start):
-					marker_genes[single_alignment.qname] = Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.full_lineage)
+					marker_genes[single_alignment.qname] = Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.optimal_lineage)
 	return marker_genes
 
 def main():
@@ -260,7 +260,7 @@ def main():
 		hit_name_gff_map = read_parsed_gffs(cached_parsed_gffs)
 	else:
 		logging.info("parsing GFF files for marker genes...")
-		hit_name_gff_map = parse_gffs(args.reference_dir, full_dataset_lineage)
+		hit_name_gff_map = parse_gffs(args.reference_dir, dataset_optimal_placement)
 		write_parsed_gffs(hit_name_gff_map, args.output_dir)
 	
 	cached_marker_gene_hits = os.path.join(args.output_dir, "marker_gene_overlaps.txt")
