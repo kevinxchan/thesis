@@ -22,7 +22,7 @@ from model.mock_analysis_classes import *
 
 def get_args():
 	parser = ArgumentParser(description = "Script to calculate MCC using a mock community and TreeSAPP.")
-	parser.add_argument("-f", "--minimap2-file", required = False, help = "Path to the minimap2 output in PAF format.")
+	parser.add_argument("-f", "--minimap2-file", required = True, help = "Path to the minimap2 output in PAF format.")
 	parser.add_argument("-r", "--reference-dir", required = True, help = "Directory containing folders for each reference organism.")
 	parser.add_argument("-t", "--dataset-taxonomies", required = True, help = "Tab delimited file matching dataset names to their reported taxonomies.")
 	parser.add_argument("-d", "--data-dir", required = True, help = "Directory containing the tax ids for each marker gene. Should be in the $TreeSAPP directory.")	
@@ -69,9 +69,17 @@ def read_parsed_gffs(parsed_gffs_file):
 	d = defaultdict(list)
 	with open(parsed_gffs_file, "r") as f:
 		for line in f:
-			hit_name, start, stop, strand, ref_gene, ref_name, full_lineage = line.strip.split("\t")
-			gff_line = GFFLine(hit_name, start, stop, strand, ref_gene, ref_name, full_lineage)
+			hit_name, start, stop, strand, ref_gene, ref_name, full_lineage = line.strip().split("\t")
+			gff_line = GFFLine(hit_name, int(start), int(stop), strand, ref_gene, ref_name, full_lineage)
 			d[hit_name].append(gff_line)
+	return d
+
+def read_marker_overlaps(marker_gene_overlaps):
+	d = {}
+	with open(marker_gene_overlaps, "r") as f:
+		for line in f:
+			query_name, gene, reference_name, optimal_placement = line.strip().split("\t")
+			d[query_name] = Overlap(query_name, gene, reference_name, optimal_placement)
 	return d
 
 def get_dataset_lineages(dataset_to_taxon):
@@ -94,11 +102,10 @@ def write_optimal_placements(placements, outdir):
 		for marker in placements[_id]:
 			outfile.write("{}\t{}\t{}\n".format(_id, marker, placements[_id][marker]))
 
-def write_final_scores(scores, outdir):
-	outfile = open(os.path.join(outdir, "ctd_scores.txt"), "w")
-	outfile.write("Dataset\tMarker\tCTD_score\n")
-	for score_line in scores:
-		outfile.write("\t".join(map(str, score_line)) + "\n")
+def write_marker_gene_overlaps(marker_genes, outdir):
+	outfile = open(os.path.join(outdir, "marker_gene_overlaps.txt"), "w")
+	for overlap_obj in marker_genes.values():
+		outfile.write("{}\t{}\t{}\t{}\n".format(overlap_obj.query_name, overlap_obj.gene, overlap_obj.reference_name, overlap_obj.optimal_placement))
 
 def write_parsed_gffs(parsed_gffs_file, output_dir):
 	outpath = os.path.join(output_dir, "parsed_gffs.txt")
@@ -172,6 +179,46 @@ def parse_gffs(reference_path, full_dataset_lineage):
 								d[hit_name].append(gff_line)
 	return d
 
+def parse_paf(paf_file):
+    """
+    Parse a Pairwise mApping Format (PAF) file, storing alignment information (e.g. read name, positions)
+    for reads that were mapped. Filters reads by maximum observed mapping quality. Assumes alignments
+    are sorted by read name (hence multiple alignments for a single read are successive).
+    :param paf_file: Path to a PAF file
+    :return: A dictionary mapping reference packages a list of PAF objects
+    """
+    hit_name_to_read = defaultdict(list)
+    with open(paf_file, "r") as infile:
+        prev_qname = ""
+        for line in infile:
+            data = line.split("\t")
+            paf_obj = PAFObj(data[0], int(data[1]), int(data[2]), int(data[3]), data[4], data[5], int(data[6]), int(data[7]),
+                             int(data[8]), int(data[9]), int(data[10]), int(data[11]))
+
+            hit_name = data[5]
+            if prev_qname != data[0]:
+                if 0 < int(data[11]) < 255:
+                    hit_name_to_read[hit_name].append(paf_obj)
+            else:
+                # filter reads by maximum mapping quality
+                if len(hit_name_to_read[hit_name]) > 0:
+                    stored_mapq = hit_name_to_read[hit_name][-1].mapq
+                    if int(data[11]) > stored_mapq:
+                        hit_name_to_read[hit_name][-1] = paf_obj
+            prev_qname = data[0]
+    return hit_name_to_read
+
+def find_overlaps(minimap2_hits, gff_hits):
+	marker_genes = {}
+	for hit_name, alignments in minimap2_hits.items():
+		for single_alignment in alignments:
+			t_start, t_stop = single_alignment.tstart, single_alignment.tend
+			for marker_hit in gff_hits[hit_name]:
+				ref_start, ref_stop = marker_hit.start, marker_hit.stop
+				if (t_start < ref_stop and t_stop > ref_start) or (ref_start < t_stop and ref_stop > t_start):
+					marker_genes[single_alignment.qname] = Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.full_lineage)
+	return marker_genes
+
 def main():
 	logging.basicConfig(level = logging.DEBUG)
 	logging.info("\n###### STARTING SCRIPT ######\n")
@@ -210,12 +257,30 @@ def main():
 	cached_parsed_gffs = os.path.join(args.output_dir, "parsed_gffs.txt")
 	if os.path.isfile(cached_parsed_gffs):
 		logging.info("found file containing parsed GFF files with marker genes in output directory, reading...")
-		reference_gff_map = read_parsed_gffs(cached_parsed_gffs)
+		hit_name_gff_map = read_parsed_gffs(cached_parsed_gffs)
 	else:
 		logging.info("parsing GFF files for marker genes...")
-		reference_gff_map = parse_gffs(args.reference_dir, full_dataset_lineage)
-		write_parsed_gffs(reference_gff_map, args.output_dir)
-	# parse info from marker contig map files
+		hit_name_gff_map = parse_gffs(args.reference_dir, full_dataset_lineage)
+		write_parsed_gffs(hit_name_gff_map, args.output_dir)
+	
+	cached_marker_gene_hits = os.path.join(args.output_dir, "marker_gene_overlaps.txt")
+	if os.path.isfile(cached_marker_gene_hits):
+		logging.info("found file with reads mapping to marker gene predictions in output directory, reading...")
+		marker_genes = read_marker_overlaps(cached_marker_gene_hits)
+		logging.info("done.")
+	else:
+		# parse through minimap2 output, find overlaps
+		logging.info("parsing through minimap2 file, saving top hits...")
+		minimap2_file = os.path.abspath(args.minimap2_file)
+		hit_name_to_read = parse_paf(minimap2_file)
+		logging.info("done.")
+
+		# find overlaps between minimap2 hits and predicted genes in GFF files
+		logging.info("finding overlaps between minimap2 output and predicted marker genes in GFF files...")
+		marker_genes = find_overlaps(hit_name_to_read, hit_name_gff_map)
+		write_marker_gene_overlaps(marker_genes, args.output_dir)
+		logging.info("done.")
+
 	# logging.info("parsing through marker contig map and calculating MCC...")
 	# args.sample_dir = os.path.abspath(args.sample_dir)
 	# marker_contig_map = read_sample_dir(args.sample_dir)
