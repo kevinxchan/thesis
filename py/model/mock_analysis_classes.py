@@ -26,6 +26,11 @@ class PAFObj:
         self.n_total_bases = n_total_bases
         self.mapq = mapq
 
+    def is_overlapping(self, other_qstart, other_qend):
+    	self_l = (self.qstart < other_qend) and (self.qend > other_qstart)
+    	self_r = (other_qstart < self.qend) and (other_qend > self.qstart)
+    	return self_l or self_r
+
 class Overlap:
 
 	def __init__(self, query_name, gene, reference_name, optimal_placement):

@@ -15,7 +15,7 @@ import os
 import logging
 import sys
 from math import sqrt
-from collections import defaultdict
+from collections import defaultdict, Counter
 from argparse import ArgumentParser
 from Bio import SeqIO
 from util.file_utils import list_dir_abs
@@ -80,11 +80,11 @@ def read_parsed_gffs(parsed_gffs_file):
 	return d
 
 def read_marker_overlaps(marker_gene_overlaps):
-	d = {}
+	d = defaultdict(list)
 	with open(marker_gene_overlaps, "r") as f:
 		for line in f:
 			query_name, gene, reference_name, optimal_placement = line.strip().split("\t")
-			d[query_name] = Overlap(query_name, gene, reference_name, optimal_placement)
+			d[query_name].append(Overlap(query_name, gene, reference_name, optimal_placement))
 	return d
 
 def readfq(fp): # this is a generator function
@@ -128,11 +128,14 @@ def get_dataset_lineages(dataset_to_taxon):
 	return ret
 
 def read_marker_contig_map(marker_contig_map):
+	# TODO: this will need to change when marker_contig_map.tsv is properly formatted
 	d = {}
 	with open(marker_contig_map, "r") as infile:
-		for line in infile:
+		for i, line in enumerate(infile):
+			if i == 0:
+				continue
 			line = line.strip().split("\t")
-			query_name = line[1].split("_")[0]
+			query_name = line[1]
 			marker = line[2]
 			confident_taxa = line[5]
 			mcm = MarkerContigMap(query_name, marker, confident_taxa)
@@ -152,8 +155,9 @@ def write_optimal_placements(placements, outdir):
 
 def write_marker_gene_overlaps(marker_genes, outdir):
 	outfile = open(os.path.join(outdir, "marker_gene_overlaps.txt"), "w")
-	for overlap_obj in marker_genes.values():
-		outfile.write("{}\t{}\t{}\t{}\n".format(overlap_obj.query_name, overlap_obj.gene, overlap_obj.reference_name, overlap_obj.optimal_placement))
+	for overlap_obj_list in marker_genes.values():
+		for overlap_obj in overlap_obj_list:
+			outfile.write("{}\t{}\t{}\t{}\n".format(overlap_obj.query_name, overlap_obj.gene, overlap_obj.reference_name, overlap_obj.optimal_placement))
 
 def write_parsed_gffs(parsed_gffs_file, output_dir):
 	outpath = os.path.join(output_dir, "parsed_gffs.txt")
@@ -234,44 +238,96 @@ def parse_gffs(reference_path, dataset_optimal_placement):
 								d[hit_name].append(gff_line)
 	return d
 
+# def parse_paf(paf_file):
+#     """
+#     Parse a Pairwise mApping Format (PAF) file, storing alignment information (e.g. read name, positions)
+#     for reads that were mapped. Filters reads by maximum observed mapping quality. Assumes alignments
+#     are sorted by read name (hence multiple alignments for a single read are successive).
+#     :param paf_file: Path to a PAF file
+#     :return: A dictionary mapping reference packages a list of PAF objects
+#     """
+#     hit_name_to_read = defaultdict(list)
+#     with open(paf_file, "r") as infile:
+#         prev_qname = ""
+#         for line in infile:
+#             data = line.split("\t")
+#             paf_obj = PAFObj(data[0], int(data[1]), int(data[2]), int(data[3]), data[4], data[5], int(data[6]), int(data[7]),
+#                              int(data[8]), int(data[9]), int(data[10]), int(data[11]))
+
+#             hit_name = data[5]
+#             if prev_qname != data[0]:
+#                 if 0 < int(data[11]) < 255:
+#                     hit_name_to_read[hit_name].append(paf_obj)
+#             else:
+#                 # filter reads by maximum mapping quality
+#                 if len(hit_name_to_read[hit_name]) > 0:
+#                     stored_mapq = hit_name_to_read[hit_name][-1].mapq
+#                     if int(data[11]) > stored_mapq:
+#                         hit_name_to_read[hit_name][-1] = paf_obj
+#             prev_qname = data[0]
+#     return hit_name_to_read
+
 def parse_paf(paf_file):
     """
     Parse a Pairwise mApping Format (PAF) file, storing alignment information (e.g. read name, positions)
     for reads that were mapped. Filters reads by maximum observed mapping quality. Assumes alignments
     are sorted by read name (hence multiple alignments for a single read are successive).
     :param paf_file: Path to a PAF file
-    :return: A dictionary mapping reference packages a list of PAF objects
+    :return: A dictionary of reference package names mapping to read names, mapping to a list of PAF objects
     """
-    hit_name_to_read = defaultdict(list)
+    hit_name_to_read = defaultdict(set)
+    missing_mapq_value = 255
+    unmapped_mapq_value = 0
     with open(paf_file, "r") as infile:
         prev_qname = ""
         for line in infile:
-            data = line.split("\t")
-            paf_obj = PAFObj(data[0], int(data[1]), int(data[2]), int(data[3]), data[4], data[5], int(data[6]), int(data[7]),
-                             int(data[8]), int(data[9]), int(data[10]), int(data[11]))
+            data = line.strip().split("\t")
+            qname, qlen, qstart, qend, strand, tname, tlen, tstart, tend, n_match_bases, n_total_bases, mapq = data[:12]
+            qlen = int(qlen)
+            qstart = int(qstart)
+            qend = int(qend)
+            tlen = int(tlen)
+            tstart = int(tstart)
+            tend = int(tend)
+            n_match_bases = int(n_match_bases)
+            n_total_bases = int(n_total_bases)
+            mapq = int(mapq)
 
-            hit_name = data[5]
-            if prev_qname != data[0]:
-                if 0 < int(data[11]) < 255:
-                    hit_name_to_read[hit_name].append(paf_obj)
+            # upfront filter for unacceptable mapping qualities
+            if mapq == missing_mapq_value or mapq == unmapped_mapq_value:
+                continue
             else:
-                # filter reads by maximum mapping quality
-                if len(hit_name_to_read[hit_name]) > 0:
-                    stored_mapq = hit_name_to_read[hit_name][-1].mapq
-                    if int(data[11]) > stored_mapq:
-                        hit_name_to_read[hit_name][-1] = paf_obj
-            prev_qname = data[0]
+                paf_obj = PAFObj(qname, qlen, qstart, qend, strand, tname, tlen, tstart, tend, n_match_bases,
+                                 n_total_bases, mapq)
+                if prev_qname != qname:
+                    hit_name_to_read[qname].add(paf_obj)
+                else:
+                    # filter reads by maximum mapping quality if they overlap
+                    is_curr_overlapping = False
+                    for stored_paf_obj in hit_name_to_read[qname].copy():
+                        if stored_paf_obj.is_overlapping(qstart, qend):
+                            is_curr_overlapping = True
+                            stored_mapq = stored_paf_obj.mapq
+                            if mapq > stored_mapq:
+                                hit_name_to_read[qname].remove(stored_paf_obj)
+                                hit_name_to_read[qname].add(paf_obj)
+                    
+                    if not is_curr_overlapping:
+                        hit_name_to_read[qname].add(paf_obj)
+
+                prev_qname = qname
+
     return hit_name_to_read
 
 def find_overlaps(minimap2_hits, gff_hits):
-	marker_genes = {}
+	marker_genes = defaultdict(list)
 	for hit_name, alignments in minimap2_hits.items():
 		for single_alignment in alignments:
 			t_start, t_stop = single_alignment.tstart, single_alignment.tend
 			for marker_hit in gff_hits[hit_name]:
 				ref_start, ref_stop = marker_hit.start, marker_hit.stop
 				if (t_start < ref_stop and t_stop > ref_start) or (ref_start < t_stop and ref_stop > t_start):
-					marker_genes[single_alignment.qname] = Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.optimal_lineage)
+					marker_genes[single_alignment.qname].append(Overlap(single_alignment.qname, marker_hit.ref_gene, marker_hit.ref_name, marker_hit.optimal_lineage))
 	return marker_genes
 
 def within_taxa_distance(query_taxa, optimal_taxa, max_dist):
@@ -289,25 +345,25 @@ def within_taxa_distance(query_taxa, optimal_taxa, max_dist):
 def calculate_positives(marker_contig_map, marker_genes, max_taxa_dist):
 	tp = fp = 0
 	for mcm_obj in marker_contig_map.values():
-			if mcm_obj.query_name not in marker_genes:
-				fp += 1
-			else:
-				true_marker = marker_genes[mcm_obj.query_name]
-				if true_marker.gene != mcm_obj.marker or not within_taxa_distance(mcm_obj.confident_taxonomy, true_marker.optimal_placement, max_taxa_dist):
-					fp += 1
-				elif true_marker.gene == mcm_obj.marker and within_taxa_distance(mcm_obj.confident_taxonomy, true_marker.optimal_placement, max_taxa_dist):
+		query_name = mcm_obj.query_name.split("_")[0] # remove start/stop coordinates
+		if query_name not in marker_genes:
+			fp += 1
+		else:
+			have_true_pos = False
+			true_marker_list = marker_genes[query_name]
+			for true_marker in true_marker_list:
+				if true_marker.gene == mcm_obj.marker and within_taxa_distance(mcm_obj.confident_taxonomy, true_marker.optimal_placement, max_taxa_dist):
 					tp += 1
-				else:
-					print(mcm_obj.marker, mcm_obj.confident_taxonomy, true_marker.optimal_placement)
-
+					have_true_pos = True
+					break
+			if not have_true_pos:
+				fp += 1
 	return (tp, fp)
 
-def calculate_negatives(marker_contig_map, marker_genes, all_read_names_set):
-	treesapp_identified = set(marker_contig_map.keys())
-	true_marker_genes = set(marker_genes.keys())
-	true_negative_read_names = all_read_names_set.difference(true_marker_genes)
-	false_negative_read_names = true_marker_genes.difference(treesapp_identified)
-	tn, fn = len(true_negative_read_names), len(false_negative_read_names)
+def calculate_negatives(marker_contig_map, marker_genes, all_read_names_set, num_true_positives, num_false_positives):
+	true_marker_genes_count = sum(len(v) for v in marker_genes.values()) # total number of identified marker genes
+	fn = true_marker_genes_count - num_true_positives
+	tn = len(all_read_names_set) - (fn + num_true_positives + num_false_positives)
 	return (tn, fn)
 
 def calculate_MCC(tp, fp, tn, fn):
@@ -360,6 +416,20 @@ def main():
 		write_parsed_gffs(hit_name_gff_map, args.output_dir)
 	
 	cached_marker_gene_hits = os.path.join(args.output_dir, "marker_gene_overlaps.txt")
+	
+
+
+	minimap2_file = os.path.abspath(args.minimap2_file)
+	foo = parse_paf(minimap2_file)
+	
+	bar = open("mock_analysis_filtered_paf.txt", "w")
+	for paf_obj_list in foo.values():
+		for paf_obj in paf_obj_list:
+			bar.write("{}\t{}\t{}\t{}\n".format(paf_obj.qname, paf_obj.qstart, paf_obj.qend, paf_obj.mapq))
+	bar.close()
+	sys.exit(1)
+
+
 	if os.path.isfile(cached_marker_gene_hits):
 		logging.info("found file with reads mapping to marker gene predictions in output directory, reading...")
 		marker_genes = read_marker_overlaps(cached_marker_gene_hits)
@@ -393,7 +463,7 @@ def main():
 	logging.info("done.")
 
 	logging.info("counting true negatives and false negatives...")
-	tn, fn = calculate_negatives(marker_contig_map, marker_genes, all_read_names_set)
+	tn, fn = calculate_negatives(marker_contig_map, marker_genes, all_read_names_set, tp, fp)
 	logging.info("done.")
 
 	logging.info("calculating MCC...")
