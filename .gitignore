@@ -1,5 +1,7 @@
 .DS_Store
 *.pyc
+py/mock_out
+py/treesapp_ctd_out
 r/*.RData
 r/.RHistory
 r/data/*
