@@ -275,7 +275,8 @@ def parse_paf(paf_file):
     :param paf_file: Path to a PAF file
     :return: A dictionary of reference package names mapping to read names, mapping to a list of PAF objects
     """
-    hit_name_to_read = defaultdict(set)
+    hit_name_to_read = defaultdict(list)
+    parser_dict = defaultdict(set)
     missing_mapq_value = 255
     unmapped_mapq_value = 0
     with open(paf_file, "r") as infile:
@@ -300,23 +301,26 @@ def parse_paf(paf_file):
                 paf_obj = PAFObj(qname, qlen, qstart, qend, strand, tname, tlen, tstart, tend, n_match_bases,
                                  n_total_bases, mapq)
                 if prev_qname != qname:
-                    hit_name_to_read[qname].add(paf_obj)
+                    parser_dict[qname].add(paf_obj)
                 else:
                     # filter reads by maximum mapping quality if they overlap
                     is_curr_overlapping = False
-                    for stored_paf_obj in hit_name_to_read[qname].copy():
+                    for stored_paf_obj in parser_dict[qname].copy():
                         if stored_paf_obj.is_overlapping(qstart, qend):
                             is_curr_overlapping = True
                             stored_mapq = stored_paf_obj.mapq
                             if mapq > stored_mapq:
-                                hit_name_to_read[qname].remove(stored_paf_obj)
-                                hit_name_to_read[qname].add(paf_obj)
+                                parser_dict[qname].remove(stored_paf_obj)
+                                parser_dict[qname].add(paf_obj)
                     
                     if not is_curr_overlapping:
-                        hit_name_to_read[qname].add(paf_obj)
+                        parser_dict[qname].add(paf_obj)
 
                 prev_qname = qname
 
+    for qname in parser_dict:
+    	for stored_paf_obj in parser_dict[qname]:
+    		hit_name_to_read[stored_paf_obj.tname].append(stored_paf_obj)
     return hit_name_to_read
 
 def find_overlaps(minimap2_hits, gff_hits):
@@ -369,7 +373,15 @@ def calculate_negatives(marker_contig_map, marker_genes, all_read_names_set, num
 def calculate_MCC(tp, fp, tn, fn):
 	numerator = (tp * tn) - (fp * fn)
 	denominator = sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-	return numerator / denominator
+	try:
+		return numerator / denominator
+	except ZeroDivisionError:
+		logging.debug("MCC calculation resulted in division by 0!")
+		print("TP: {}".format(tp))
+		print("FP: {}".format(fp))
+		print("TN: {}".format(tn))
+		print("FN: {}".format(fn))
+		sys.exit(1)
 
 def main():
 	logging.basicConfig(level = logging.DEBUG)
@@ -416,20 +428,6 @@ def main():
 		write_parsed_gffs(hit_name_gff_map, args.output_dir)
 	
 	cached_marker_gene_hits = os.path.join(args.output_dir, "marker_gene_overlaps.txt")
-	
-
-
-	minimap2_file = os.path.abspath(args.minimap2_file)
-	foo = parse_paf(minimap2_file)
-	
-	bar = open("mock_analysis_filtered_paf.txt", "w")
-	for paf_obj_list in foo.values():
-		for paf_obj in paf_obj_list:
-			bar.write("{}\t{}\t{}\t{}\n".format(paf_obj.qname, paf_obj.qstart, paf_obj.qend, paf_obj.mapq))
-	bar.close()
-	sys.exit(1)
-
-
 	if os.path.isfile(cached_marker_gene_hits):
 		logging.info("found file with reads mapping to marker gene predictions in output directory, reading...")
 		marker_genes = read_marker_overlaps(cached_marker_gene_hits)
