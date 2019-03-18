@@ -15,9 +15,8 @@ import os
 import logging
 import sys
 from math import sqrt
-from collections import defaultdict, Counter
+from collections import defaultdict
 from argparse import ArgumentParser
-from Bio import SeqIO
 from util.file_utils import list_dir_abs
 from util.jgi_utils import query_jgi_taxa
 from model.mock_analysis_classes import *
@@ -31,7 +30,7 @@ def get_args():
 	parser.add_argument("-m", "--marker-genes", required = True, help = "Comma delimited list of marker genes tested.")	
 	parser.add_argument("--raw-data", required = True, help = "Path to raw FASTQ mock community data.")
 	parser.add_argument("--treesapp-hits", required = True, help = "Path to the TreeSAPP marker_contig_map.tsv file.")
-	parser.add_argument("--max-taxa-distance", required = True, help = "Maximum taxonomic distance allowed before counting as a false positive.")
+	parser.add_argument("--max-taxa-distance", default = 2, help = "Maximum taxonomic distance allowed before counting as a false positive.")
 	parser.add_argument("-o", "--output-dir", default = ".", help = "Path to the output directory.")
 	args = parser.parse_args()
 	return args
@@ -366,8 +365,17 @@ def calculate_positives(marker_contig_map, marker_genes, max_taxa_dist):
 
 def calculate_negatives(marker_contig_map, marker_genes, all_read_names_set, num_true_positives, num_false_positives):
 	true_marker_genes_count = sum(len(v) for v in marker_genes.values()) # total number of identified marker genes
-	fn = true_marker_genes_count - num_true_positives
-	tn = len(all_read_names_set) - (fn + num_true_positives + num_false_positives)
+	fn = true_marker_genes_count - num_true_positives	
+	tn = 0
+	mcm_read_name = defaultdict(list)
+	
+	# remove coordinates from read names
+	for k, v in marker_contig_map.items():
+		mcm_read_name[k.split("_")[0]].append(v)
+
+	for read_name in all_read_names_set:
+		if read_name not in marker_genes and read_name not in mcm_read_name:
+			tn += 1
 	return (tn, fn)
 
 def calculate_MCC(tp, fp, tn, fn):
