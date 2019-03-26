@@ -10,11 +10,11 @@ then for M, and a dataset, CTD = sum d * p. therefore, a single data point repre
 
 import os
 import logging
-import requests
 import sys
 from collections import defaultdict
 from argparse import ArgumentParser
 from util.file_utils import list_dir_abs
+from util.jgi_utils import query_jgi_taxa
 
 def get_args():
 	parser = ArgumentParser(description = "Script to gather CTD per marker genes, so a scatter plot of CTD vs marker gene can be made.")
@@ -85,20 +85,6 @@ def write_final_scores(scores, outdir):
 	outfile.write("Dataset\tMarker\tCTD_score\n")
 	for score_line in scores:
 		outfile.write("\t".join(map(str, score_line)) + "\n")
-
-def query_jgi_taxa(query):
-	url = "http://taxonomy.jgi-psf.org/name/sc"
-	r = requests.get(os.path.join(url, query))
-	return clean_lineage(r.text) 
-
-def clean_lineage(jgi_lineage):
-	cleaned_lineage = []
-	ranks = jgi_lineage.split(";")
-	for rank in ranks:
-		if ":" in rank:
-			rank = rank.split(":")[1]
-			cleaned_lineage.append(rank)
-	return "Root; " + "; ".join(cleaned_lineage)
 
 def get_optimal_placements(full_dataset_lineage, marker_file):
 	depth = -1

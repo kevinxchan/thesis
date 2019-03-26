@@ -12,7 +12,7 @@ treesapp_dir=$2
 input_dir=$3
 out_dir=$4
 
-THREADS=12
+THREADS=16
 
 if [[ -z $1 || -z $2 || -z $3 || -z $4 ]]; then
 	echo "argument error: pass in list of dataset names, TreeSAPP directory, input and output path"
