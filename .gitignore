@@ -3,3 +3,5 @@
 r/*.RData
 r/.RHistory
 r/data/*
+r/*.Rproj
+.Rproj.user

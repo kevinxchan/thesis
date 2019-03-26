@@ -18,5 +18,5 @@ fig <- ggplot(dat, aes(x = Marker, y = CTD_score)) +
         axis.text.x = element_text(angle = 45, hjust = 1),
         plot.title = element_text(hjust = 0.5))
 
-ggsave(fig, filename = "treesapp_ctd.png")
+ggsave(fig, filename = "treesapp_ctd.png", width = 8, height = 5, dpi = 400)
  

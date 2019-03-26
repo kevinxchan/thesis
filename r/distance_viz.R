@@ -73,13 +73,17 @@ filter(fig_1, TaxDistance >= 4) %>%
   filter(Total > 0)
 pd <- position_dodge(width = 0.75)
 
-ggplot(fig_1, aes(x=TaxDistance, y=Proportion, fill=MarkerGene)) +
+fig_1 %>%
+  mutate(MarkerGene = ifelse(MarkerGene == "ribosomal_L10P", "RPL10", as.character(MarkerGene))) %>%
+  
+  ggplot(aes(x=TaxDistance, y=Proportion, fill=MarkerGene)) +
   geom_bar(stat="identity", position=pd, colour="black", width = 0.75) +
   facet_wrap(~Software) +
   scale_fill_brewer(palette = "PuOr") +
   scale_y_continuous(breaks=seq(0,100,10)) +
   xlab("Distance from Optimal Rank") +
   ylab("Percentage of Queries") +
+  labs(fill = "Marker Gene") +
   theme(panel.background = element_blank(),
         panel.grid.major = element_line(colour = "#bdbdbd", linetype = "dotted"),
         panel.grid.minor = element_blank())
@@ -112,21 +116,25 @@ ggplot(harm_dist_dat, aes(x=DatasetID, y=CumTaxDistance)) +
         panel.grid.major = element_line(colour = "#bdbdbd", linetype = "dotted"),
         panel.grid.minor = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1))
+
 ggsave(filename = cdist_out, width = 8, height = 5, dpi = 400)
 
-ggplot(harm_dist_dat, aes(x=MarkerGene, y=CumTaxDistance)) +
+harm_dist_dat %>%
+  mutate(MarkerGene = ifelse(MarkerGene == "ribosomal_L10P", "RPL10", as.character(MarkerGene))) %>%
+  
+  ggplot(aes(x=MarkerGene, y=CumTaxDistance)) +
   geom_jitter(aes(fill=DatasetID), position=position_jitter(0.1), colour="black",
               shape=21, size=3, alpha=2/3) +
-  # geom_point(aes(fill=DatasetID), colour="black",
-  #            shape=21, size=3, alpha=2/3) +
   scale_fill_brewer(palette = "PuOr") +
   facet_wrap(~Software) +
   ylab("Cumulative Taxonomic Distance") +
   xlab("Marker Gene") +
+  labs(fill = "Dataset ID") +
   theme(panel.background = element_blank(),
         panel.grid.major = element_line(colour = "#bdbdbd", linetype = "dotted"),
         panel.grid.minor = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1))
+
 ggsave(filename = pdist_out, width = 8, height = 5, dpi = 400)
 
 stat <- harm_dist_dat %>%
