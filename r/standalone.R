@@ -29,15 +29,9 @@ acc_dat$Software <- sub("graphmap", "GraphMap", acc_dat$Software)
 head(acc_dat)
 
 graphmap_dat <- acc_dat %>%
-  filter(Software == "GraphMap" & TaxDistance >= 0)
+  filter(Software == "GraphMap" & TaxDistance >= 0 & MeanAlignmentPercentage >= 20)
 minimap_dat <- acc_dat %>%
-  filter(Software == "minimap2" & TaxDistance >= 0)
-
-## overall stats including mean and median
-summary(graphmap_dat$TaxDistance)
-summary(minimap_dat$TaxDistance)
-summary(graphmap_dat$CumDistance)
-summary(minimap_dat$CumDistance)
+  filter(Software == "minimap2" & TaxDistance >= 0 & MeanAlignmentPercentage >= 20)
 
 # marker gene specific mean, median, IQR for taxa distance and contiguous taxa distance
 markers <- c("pyrG", "recA", "ribosomal_L10P", "rpoB", "rps8")
@@ -182,3 +176,12 @@ write_tsv(tax_distance_summary_minimap, path = "./td_minimap2.txt")
 write_tsv(ctd_graphmap, path = "./cumtd_graphmap.txt")
 write_tsv(ctd_minimap, path = "./cumtd_minimap2.txt")
 
+gm <- harm_dist_dat %>%
+  filter(Software == "GraphMap")
+mm2 <- harm_dist_dat %>%
+  filter(Software == "minimap2")
+
+summary(gm$CumTaxDistance)
+summary(mm2$CumTaxDistance)
+summary(graphmap_dat$TaxDistance)
+summary(minimap_dat$TaxDistance)
