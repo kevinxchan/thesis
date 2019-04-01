@@ -11,7 +11,6 @@ fig <- ggplot(dat, aes(x = Marker, y = CTD_score)) +
   scale_fill_brewer(palette = "PuOr") +
   xlab("Marker Gene") +
   ylab("Cumulative Taxonomic Distance") +
-  ggtitle("CTD Per Marker Gene") +
   theme(panel.background = element_blank(),
         panel.grid.major = element_line(colour = "#bdbdbd", linetype = "dotted"),
         panel.grid.minor = element_blank(),
