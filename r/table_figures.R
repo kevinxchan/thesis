@@ -9,15 +9,16 @@ dat <- cbind(classifications, values)
 colnames(dat) <- c("Classifications", "Scores")
 
 t1 <- ttheme_default(core=list(
-  fg_params=list(fontface=c(rep("plain", 4), "bold")),
-                   alpha = rep(c(1,0.5), each=5))
+  fg_params=list(fontface=c(rep("plain", 4), "bold"), cex = 0.75),
+                   alpha = rep(c(1,0.5), each=5),
+  colhead = list(fg_params=list(cex = 0.75)),
+  rowhead = list(fg_params=list(cex = 0.75)))
 )
 
 g <- tableGrob(dat, theme = t1)
-png("100kHighRes300dpi.png", units="px", width=1600, height=1600, res=300)
-plot(g, main="100,000 points", col=adjustcolor("black", alpha=0.2))
-dev.off()
-g
+h <- convertHeight(sum(g$heights), "in", TRUE)
+w <- convertWidth(sum(g$widths), "in", TRUE)
+ggsave(g, filename = "MCC.png", width=w, height=h, dpi=400)
 
 ## TABLE 2: metadata table for each dataset used in analyses
 metadata_table <- read_tsv("~/Documents/UBC/YEAR4/MICB449/datasets/raw_metadata.txt")
